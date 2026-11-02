@@ -99,6 +99,52 @@
 \section{Decisiones tecnológicas}
 \label{sec:decisiones}
 
+Usaremos \textbf{MongoDB} con índices \campo{2dsphere} y compararemos
+\textbf{Google Open Buildings v3} con \textbf{Microsoft Building Footprints}.
+Todo el flujo corre en Python dentro de Docker para que sea reproducible.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Decisiones tecnológicas del proyecto.}
+\label{tab:decisiones}
+\begin{tabularx}{\textwidth}{@{}p{2.6cm}p{3.6cm}L@{}}
+\toprule
+\textbf{Decisión} & \textbf{Elección} & \textbf{Justificación} \\
+\midrule
+Motor NoSQL & MongoDB 8 (modelo documental) &
+  Guarda geometrías en GeoJSON de forma nativa, tiene índices \campo{2dsphere}
+  y operadores \campo{\$geoWithin} y \campo{\$geoIntersects}~\cite{mongodb}.
+  Su pipeline de agregación con \campo{\$group} y \campo{\$merge} calcula los
+  totales por municipio dentro de la base. Puede escalar horizontalmente con
+  sharding. \\
+Fuente de edificios 1 & Google Open Buildings v3~\cite{google} &
+  Cubre América Latina con imágenes de 50 cm (inferencia de mayo de 2023).
+  Trae \campo{area\_in\_meters} y \campo{confidence} (de 0,65 a 1,0), lo que
+  permite validar nuestras áreas y hacer análisis de sensibilidad. \\
+Fuente de edificios 2 & Microsoft Building Footprints~\cite{microsoft} &
+  Imágenes de 2014 a 2021 con licencia ODbL. Está en GeoParquet particionado
+  por país (\campo{RegionName}) y por quadkey de nivel 9, así que se puede
+  descargar solo Colombia. Solo trae la geometría, por lo que el área se
+  calcula. \\
+Límites municipales & MGN 2025 del DANE, nivel municipio~\cite{mgn} &
+  Es la fuente oficial que exige el enunciado. Se filtra con los 170 códigos
+  de \campo{MunicipiosPDET.xlsx}. \\
+Sistemas de referencia & Almacenamiento en WGS84 (EPSG:4326); áreas en
+  MAGNA-SIRGAS Origen Nacional (EPSG:9377) &
+  GeoJSON y \campo{2dsphere} exigen longitud y latitud en WGS84. Las áreas se
+  calculan en una proyección plana oficial de Colombia para que queden en
+  metros cuadrados. \\
+Herramientas & Python 3.12, GeoPandas, Shapely, PyMongo, DuckDB, Docker
+  Compose, GitHub &
+  GeoPandas valida y reproyecta. DuckDB lee los Parquet y filtra antes de
+  cargar. PyMongo carga por lotes. Docker Compose levanta la misma base en
+  cualquier máquina. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
 % =====================================================================
 % 3. Plan de implementación
 % =====================================================================

@@ -63,23 +63,26 @@
   \centering
   {\large Pontificia Universidad Javeriana\par}
   {\large Departamento de Ingeniería de Sistemas\par}
-  \vspace{0.4cm}
-  {\large Administración de Bases de Datos (DBA) -- 2026-30\par}
-  \vspace{3cm}
-  {\Huge\bfseries Proyecto final\par}
-  \vspace{0.4cm}
-  {\LARGE Entrega 1: Diseño del esquema NoSQL\\ y plan de implementación\par}
   \vspace{0.8cm}
+  {\large Administración de Bases de Datos (DBA) -- 2026-30\par}
+  \vspace{2.5cm}
+  {\Huge\bfseries Proyecto final\par}
+  \vspace{1cm}
+  {\LARGE Entrega 1: Diseño del esquema NoSQL\\ y plan de implementación\par}
+  \vspace{1cm}
   {\large Potencial solar en techos de los municipios PDET\par}
-  \vfill
+  \vspace{3cm}
   {\large
     Maria Camila Beltran \\
+    \vspace{0.5cm}
     Jorge Fortich \\
+    \vspace{0.5cm}
     Jose Eduardo Valeriano \\
+    \vspace{0.5cm}
     Samuel Osorio Rodríguez\par}
-  \vspace{1cm}
+  \vspace{3cm}
   {\large Profesor: Andrés Oswaldo Calderón Romero, Ph.D.\par}
-  \vspace{0.4cm}
+  \vspace{3cm}
   {\large 2 de noviembre de 2026\par}
 \end{titlepage}
 
@@ -358,28 +361,32 @@ EPSG:9377.
 \end{table}
 
 \subsection{\texorpdfstring{\campo{edificios\_google} y \campo{edificios\_microsoft}}{edificios\_google y edificios\_microsoft}}
-
+ 
+Las dos colecciones tienen el mismo esquema. Los campos que una fuente no
+trae quedan en \campo{null}.
+ 
 \begin{table}[H]
 \centering\small
-\begin{tabularx}{\textwidth}{@{}p{3cm}p{3.6cm}Lp{2.6cm}@{}}
+\begin{tabularx}{\textwidth}{@{}p{3cm}p{3.2cm}Lp{2.6cm}@{}}
 \toprule
 \textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} & \textbf{Origen} \\
 \midrule
-\campo{\_id} & string  & Código DANE del municipio, con ceros a la izquierda (\campo{05045}) & MGN / Excel PDET \\
-\campo{nombre} & string & Nombre del municipio & MGN \\
-\campo{cod\_dpto} & string  & Código DANE del departamento & MGN \\
-\campo{departamento} & string & Nombre del departamento & MGN \\
-\campo{subregion\_pdet} & objeto \{id: int, nombre: string\} & Subregión PDET (embebida, una de 16) & Excel PDET \\
-\campo{area\_km2} & double & Área del municipio & Calculado (EPSG:9377) \\
-\campo{geometry} & GeoJSON Polygon o MultiPolygon & Límite municipal & MGN (reproyectado) \\
-\campo{calidad} & objeto \{valida: bool, reparada: bool, n\_vertices: int\} & Resultado de la validación de la geometría & Calculado \\
-\campo{fuente\_id} & string & Referencia a \campo{fuentes} (\campo{mgn}) & Calculado \\
+\campo{\_id} & ObjectId & Identificador interno & MongoDB \\
+\campo{fuente\_id} & string & Referencia a \campo{fuentes} (\campo{google} o \campo{microsoft}) & Calculado \\
+\campo{geometry} & GeoJSON Polygon & Huella del edificio & Fuente \\
+\campo{centroide} & GeoJSON Point & Centroide de la huella; base de la regla de asignación & Calculado \\
+\campo{area\_m2} & double & Área de la huella & Calculado (EPSG:9377) \\
+\campo{area\_m2\_fuente} & double o null & Área reportada por la fuente (\campo{area\_in\_meters} de Google) & Fuente \\
+\campo{confianza} & double o null & Confianza del modelo, de 0,65 a 1,0 (solo Google) & Fuente \\
+\campo{cod\_mpio} & string o null & Referencia a \campo{municipios}; se llena en la fase 4 & Calculado \\
+\campo{geom\_hash} & string & Hash de la geometría para detectar duplicados & Calculado \\
+\campo{lote\_id} & ObjectId & Referencia a la carga que trajo el registro (\campo{bitacora\_cargas}) & Calculado \\
 \bottomrule
 \end{tabularx}
 \end{table}
-
+ 
 \subsection{\texorpdfstring{\campo{fuentes}}{fuentes}}
-
+ 
 \begin{table}[H]
 \centering\small
 \begin{tabularx}{\textwidth}{@{}p{3.4cm}p{2.4cm}L@{}}
@@ -400,22 +407,21 @@ EPSG:9377.
 \end{table}
 
 \subsection{\texorpdfstring{\campo{resultados}}{resultados}}
-
+ 
 \begin{table}[H]
 \centering\small
-\begin{tabularx}{\textwidth}{@{}p{3.4cm}p{2.4cm}L@{}}
+\begin{tabularx}{\textwidth}{@{}p{3.4cm}p{3.6cm}L@{}}
 \toprule
 \textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
 \midrule
-\campo{\_id} & string & \campo{google}, \campo{microsoft} o \campo{mgn} \\
-\campo{nombre} & string & Nombre completo del dataset \\
-\campo{version} & string & Versión (v3, fecha de proceso de Microsoft, MGN2025) \\
-\campo{licencia} & string & CC BY-4.0, ODbL, etc. \\
-\campo{url\_descarga} & string & Origen exacto de los archivos \\
-\campo{periodo\_imagenes} & string & Fechas de las imágenes satelitales \\
-\campo{crs\_origen} & string & Sistema de referencia en que llegan los datos \\
-\campo{fecha\_descarga} & date & Cuándo se descargó \\
-\campo{n\_registros} & long & Registros cargados en la base \\
+\campo{\_id} & objeto \{cod\_mpio, fuente\_id\} & Llave compuesta: un documento por municipio y fuente \\
+\campo{n\_edificios} & int & Edificios cuyo centroide cae en el municipio \\
+\campo{area\_total\_m2} & double & Suma de \campo{area\_m2} \\
+\campo{area\_media\_m2} & double & Área promedio por edificio \\
+\campo{densidad\_km2} & double & Edificios por km\textsuperscript{2} del municipio \\
+\campo{pct\_techos} & double & Área de techos sobre el área del municipio, en \% \\
+\campo{parametros} & objeto & Umbral de confianza, regla de asignación y versión del código \\
+\campo{fecha\_calculo} & date & Cuándo se ejecutó \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -424,19 +430,16 @@ EPSG:9377.
 
 \begin{table}[H]
 \centering\small
-\begin{tabularx}{\textwidth}{@{}p{3.4cm}p{2.4cm}L@{}}
+\begin{tabularx}{\textwidth}{@{}p{4.4cm}p{2.4cm}L@{}}
 \toprule
 \textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
 \midrule
-\campo{\_id} & string & \campo{google}, \campo{microsoft} o \campo{mgn} \\
-\campo{nombre} & string & Nombre completo del dataset \\
-\campo{version} & string & Versión (v3, fecha de proceso de Microsoft, MGN2025) \\
-\campo{licencia} & string & CC BY-4.0, ODbL, etc. \\
-\campo{url\_descarga} & string & Origen exacto de los archivos \\
-\campo{periodo\_imagenes} & string & Fechas de las imágenes satelitales \\
-\campo{crs\_origen} & string & Sistema de referencia en que llegan los datos \\
-\campo{fecha\_descarga} & date & Cuándo se descargó \\
-\campo{n\_registros} & long & Registros cargados en la base \\
+\campo{\_id} & ObjectId & Identificador de la ejecución \\
+\campo{fuente\_id} & string & Referencia a \campo{fuentes} \\
+\campo{etapa} & string & \campo{descarga}, \campo{limpieza}, \campo{carga}, \campo{indices} o \campo{analisis} \\
+\campo{inicio}, \campo{fin} & date & Duración de la etapa \\
+\campo{registros\_ok}, \campo{registros\_error} & long & Resultado de la etapa \\
+\campo{parametros} & objeto & Copia de la configuración usada \\
 \bottomrule
 \end{tabularx}
 \end{table}

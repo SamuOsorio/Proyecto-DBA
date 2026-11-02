@@ -93,6 +93,29 @@
 \section{Contexto y objetivo}
 \label{sec:contexto}
 
+El proyecto estima, para cada uno de los \textbf{170 municipios PDET}, cuántas
+edificaciones hay y cuál es el área total de techos disponible para paneles
+solares. Para eso compara dos fuentes abiertas de huellas de edificios y usa
+una base de datos NoSQL con índices espaciales.
+
+La Oficina de Investigación e Información de la UPME busca municipios
+candidatos para proyectos piloto de granjas solares. A mayor
+área de techos en un municipio, mayor potencial de captación. La lista oficial
+de municipios viene en \campo{MunicipiosPDET.xlsx}: 170 municipios en 16
+subregiones PDET y 19 departamentos~\cite{pdet}.
+
+Esta primera entrega fija las bases del proyecto:
+
+\begin{itemize}
+  \item \textbf{Plan de implementación}: la metodología completa, desde la
+        descarga de los datos hasta el informe final.
+  \item \textbf{Diseño del esquema y modelo de datos}: el diagrama E-R de las
+        colecciones y el diccionario de datos.
+\end{itemize}
+
+Las entregas siguientes construyen sobre este diseño: límites PDET (semana 2),
+carga de edificios (semana 3) y análisis e informe final (semana 4).
+
 % =====================================================================
 % 2. Decisiones tecnológicas
 % =====================================================================

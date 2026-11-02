@@ -1,0 +1,176 @@
+% =====================================================================
+% DBA - Proyecto final - Entrega 1
+% Diseño del esquema NoSQL y plan de implementación
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+% =====================================================================
+% Preámbulo compartido - DBA Proyecto final
+% =====================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}{}
+\usepackage[spanish,es-noshorthands,es-tabla]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,array}
+\usepackage{enumitem}
+\usepackage[dvipsnames,table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{calc,positioning}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+
+% --- Colores --------------------------------------------------------
+\definecolor{acento}{HTML}{2F6FDB}
+\definecolor{gris}{HTML}{6B6B6B}
+\hypersetup{colorlinks=true, linkcolor=acento, urlcolor=acento, citecolor=acento}
+
+% --- Tablas ---------------------------------------------------------
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.25}
+
+% --- Listas ---------------------------------------------------------
+\setlist{itemsep=2pt, topsep=4pt}
+
+% --- Código (JSON / mongosh) ----------------------------------------
+\lstdefinestyle{codigo}{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{gray!50},
+  backgroundcolor=\color{gray!6},
+  xleftmargin=4pt, xrightmargin=4pt,
+  showstringspaces=false,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+           {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+           {ñ}{{\~n}}1 {Ñ}{{\~N}}1
+}
+\lstset{style=codigo}
+
+% --- Atajos ---------------------------------------------------------
+\newcommand{\campo}[1]{\texttt{#1}}
+
+\begin{document}
+
+% ------------------------------- Portada -----------------------------
+\begin{titlepage}
+  \centering
+  {\large Pontificia Universidad Javeriana\par}
+  {\large Departamento de Ingeniería de Sistemas\par}
+  \vspace{0.4cm}
+  {\large Administración de Bases de Datos (DBA) -- 2026-30\par}
+  \vspace{3cm}
+  {\Huge\bfseries Proyecto final\par}
+  \vspace{0.4cm}
+  {\LARGE Entrega 1: Diseño del esquema NoSQL\\ y plan de implementación\par}
+  \vspace{0.8cm}
+  {\large Potencial solar en techos de los municipios PDET\par}
+  \vfill
+  {\large
+    Maria Camila Beltran \\
+    Jorge Fortich \\
+    Jose Eduardo Valeriano \\
+    Samuel Osorio Rodríguez\par}
+  \vspace{1cm}
+  {\large Profesor: Andrés Oswaldo Calderón Romero, Ph.D.\par}
+  \vspace{0.4cm}
+  {\large 2 de noviembre de 2026\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ------------------------------- Secciones ---------------------------
+% =====================================================================
+% 1. Contexto y objetivo
+% =====================================================================
+\section{Contexto y objetivo}
+\label{sec:contexto}
+
+% =====================================================================
+% 2. Decisiones tecnológicas
+% =====================================================================
+\section{Decisiones tecnológicas}
+\label{sec:decisiones}
+
+% =====================================================================
+% 3. Plan de implementación
+% =====================================================================
+\section{Plan de implementación}
+\label{sec:plan}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Infraestructura (semana 1)}
+
+  \item \textbf{Límites PDET (semana 2)}
+
+  \item \textbf{Huellas de edificios (semana 3)}
+
+  \item \textbf{Análisis espacial (semana 4)}
+
+  \item \textbf{Resultados e informe (semana 4)}
+
+\end{enumerate}
+
+% =====================================================================
+% 4. Diseño del esquema
+% =====================================================================
+\section{Diseño del esquema}
+\label{sec:esquema}
+
+% =====================================================================
+% 5. Diccionario de datos
+% =====================================================================
+\section{Diccionario de datos}
+\label{sec:diccionario}
+
+\subsection{\texorpdfstring{\campo{municipios}}{municipios}}
+
+\subsection{\texorpdfstring{\campo{edificios\_google} y \campo{edificios\_microsoft}}{edificios\_google y edificios\_microsoft}}
+
+\subsection{\texorpdfstring{\campo{fuentes}}{fuentes}}
+
+\subsection{\texorpdfstring{\campo{resultados}}{resultados}}
+
+\subsection{\texorpdfstring{\campo{bitacora\_cargas}}{bitacora\_cargas}}
+
+\subsection{Índices}
+
+% ------------------------------- Referencias -------------------------
+% =====================================================================
+% Referencias
+% =====================================================================
+\begin{thebibliography}{9}
+
+\bibitem{pdet}
+Agencia de Renovación del Territorio, \emph{Municipios PDET}
+(\texttt{MunicipiosPDET.xlsx}, carpeta de recursos del curso).
+\url{https://www.renovacionterritorio.gov.co/central-pdet/que-son-los-pdet}
+
+\bibitem{mgn}
+DANE, \emph{Marco Geoestadístico Nacional -- Descarga de datos
+geoestadísticos}, 2025.
+\url{https://geoportal.dane.gov.co/servicios/descarga-y-metadatos/datos-geoestadisticos/?cod=111}
+
+\bibitem{google}
+Google Research, \emph{Open Buildings V3 Polygons}, catálogo de Earth Engine.
+\url{https://developers.google.com/earth-engine/datasets/catalog/GOOGLE_Research_open-buildings_v3_polygons}
+
+\bibitem{microsoft}
+Microsoft, \emph{ms-buildings: Global ML Building Footprints}, Planetary
+Computer.
+\url{https://planetarycomputer.microsoft.com/dataset/ms-buildings}
+
+\bibitem{mongodb}
+MongoDB, Inc., \emph{Query a 2dsphere Index}, documentación de MongoDB.
+\url{https://www.mongodb.com/docs/current/tutorial/query-a-2dsphere-index/}
+
+\end{thebibliography}
+
+\end{document}

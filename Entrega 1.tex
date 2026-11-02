@@ -123,6 +123,55 @@
 % =====================================================================
 \section{Diseño del esquema}
 \label{sec:esquema}
+ 
+El esquema tiene cinco colecciones. Las centrales son los municipios y los
+edificios, que se relacionan por una consulta espacial: cada edificio
+pertenece al municipio que contiene su centroide
+(figura~\ref{fig:er}).
+ 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{diagrama_er.png}
+  \caption{Diagrama E-R del esquema en MongoDB.}
+  \label{fig:er}
+\end{figure}
+ 
+El E-R se adapta al modelo documental de MongoDB y usa notación pata de
+gallo. Cada relación es una referencia por \campo{\_id} y conecta el campo
+que referencia (FK) con la llave del documento referenciado (PK). Los símbolos
+en los extremos de cada línea indican la cardinalidad:
+ 
+\begin{itemize}
+  \item \textbf{Dos barras} ($\Vert$): exactamente uno.
+  \item \textbf{Círculo y barra}: cero o uno.
+  \item \textbf{Círculo y pata de gallo}: cero o muchos.
+  \item \textbf{Línea azul}: relación espacial. No es una llave foránea
+        común: \campo{cod\_mpio} se llena con \campo{\$geoWithin}, asignando
+        cada edificio al municipio que contiene su centroide.
+\end{itemize}
+ 
+El símbolo $\blacklozenge$ indica un índice
+\campo{2dsphere}, y los campos indentados bajo \campo{subregion\_pdet} y
+\campo{calidad} son subdocumentos embebidos.
+ 
+\begin{itemize}
+  \item \textbf{Subregión PDET embebida en el municipio.} Es un dato pequeño,
+        no cambia y siempre se lee junto con el municipio.
+  \item \textbf{Edificios referenciados, no embebidos.} Un municipio puede
+        tener miles de edificios, y embebidos superarían el límite de 16~MB
+        por documento. Cada edificio guarda \campo{cod\_mpio} como
+        referencia.
+  \item \textbf{Una colección por fuente de edificios.} Las dos tienen el
+        mismo esquema, pero así se pueden cargar, reindexar o borrar por
+        separado y comparar sin mezclar datos.
+  \item \textbf{Centroide guardado aparte.} La asignación solo necesita un
+        punto, e indexar un punto es más barato que indexar un polígono.
+  \item \textbf{Resultados precalculados.} \campo{resultados} guarda un
+        documento por municipio y fuente, así los mapas y el informe no
+        repiten la consulta espacial.
+  \item \textbf{Bitácora de cargas.} Cada ejecución queda registrada con sus
+        parámetros, como evidencia de reproducibilidad.
+\end{itemize}
 
 % =====================================================================
 % 5. Diccionario de datos
@@ -130,17 +179,132 @@
 \section{Diccionario de datos}
 \label{sec:diccionario}
 
+Las cinco colecciones viven en la base \campo{upme\_solar}. Todas las
+geometrías están en GeoJSON con coordenadas \campo{[longitud, latitud]} en
+WGS84, y todas las áreas están en m\textsuperscript{2} calculados en
+EPSG:9377.
+
 \subsection{\texorpdfstring{\campo{municipios}}{municipios}}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}p{3cm}p{3.6cm}Lp{2.6cm}@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} & \textbf{Origen} \\
+\midrule
+\campo{\_id} & string  & Código DANE del municipio, con ceros a la izquierda (\campo{05045}) & MGN / Excel PDET \\
+\campo{nombre} & string & Nombre del municipio & MGN \\
+\campo{cod\_dpto} & string  & Código DANE del departamento & MGN \\
+\campo{departamento} & string & Nombre del departamento & MGN \\
+\campo{subregion\_pdet} & objeto \{id: int, nombre: string\} & Subregión PDET (embebida, una de 16) & Excel PDET \\
+\campo{area\_km2} & double & Área del municipio & Calculado (EPSG:9377) \\
+\campo{geometry} & GeoJSON Polygon o MultiPolygon & Límite municipal & MGN (reproyectado) \\
+\campo{calidad} & objeto \{valida: bool, reparada: bool, n\_vertices: int\} & Resultado de la validación de la geometría & Calculado \\
+\campo{fuente\_id} & string & Referencia a \campo{fuentes} (\campo{mgn}) & Calculado \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \subsection{\texorpdfstring{\campo{edificios\_google} y \campo{edificios\_microsoft}}{edificios\_google y edificios\_microsoft}}
 
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}p{3cm}p{3.6cm}Lp{2.6cm}@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} & \textbf{Origen} \\
+\midrule
+\campo{\_id} & string  & Código DANE del municipio, con ceros a la izquierda (\campo{05045}) & MGN / Excel PDET \\
+\campo{nombre} & string & Nombre del municipio & MGN \\
+\campo{cod\_dpto} & string  & Código DANE del departamento & MGN \\
+\campo{departamento} & string & Nombre del departamento & MGN \\
+\campo{subregion\_pdet} & objeto \{id: int, nombre: string\} & Subregión PDET (embebida, una de 16) & Excel PDET \\
+\campo{area\_km2} & double & Área del municipio & Calculado (EPSG:9377) \\
+\campo{geometry} & GeoJSON Polygon o MultiPolygon & Límite municipal & MGN (reproyectado) \\
+\campo{calidad} & objeto \{valida: bool, reparada: bool, n\_vertices: int\} & Resultado de la validación de la geometría & Calculado \\
+\campo{fuente\_id} & string & Referencia a \campo{fuentes} (\campo{mgn}) & Calculado \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
 \subsection{\texorpdfstring{\campo{fuentes}}{fuentes}}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}p{3.4cm}p{2.4cm}L@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+\midrule
+\campo{\_id} & string & \campo{google}, \campo{microsoft} o \campo{mgn} \\
+\campo{nombre} & string & Nombre completo del dataset \\
+\campo{version} & string & Versión (v3, fecha de proceso de Microsoft, MGN2025) \\
+\campo{licencia} & string & CC BY-4.0, ODbL, etc. \\
+\campo{url\_descarga} & string & Origen exacto de los archivos \\
+\campo{periodo\_imagenes} & string & Fechas de las imágenes satelitales \\
+\campo{crs\_origen} & string & Sistema de referencia en que llegan los datos \\
+\campo{fecha\_descarga} & date & Cuándo se descargó \\
+\campo{n\_registros} & long & Registros cargados en la base \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \subsection{\texorpdfstring{\campo{resultados}}{resultados}}
 
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}p{3.4cm}p{2.4cm}L@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+\midrule
+\campo{\_id} & string & \campo{google}, \campo{microsoft} o \campo{mgn} \\
+\campo{nombre} & string & Nombre completo del dataset \\
+\campo{version} & string & Versión (v3, fecha de proceso de Microsoft, MGN2025) \\
+\campo{licencia} & string & CC BY-4.0, ODbL, etc. \\
+\campo{url\_descarga} & string & Origen exacto de los archivos \\
+\campo{periodo\_imagenes} & string & Fechas de las imágenes satelitales \\
+\campo{crs\_origen} & string & Sistema de referencia en que llegan los datos \\
+\campo{fecha\_descarga} & date & Cuándo se descargó \\
+\campo{n\_registros} & long & Registros cargados en la base \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
 \subsection{\texorpdfstring{\campo{bitacora\_cargas}}{bitacora\_cargas}}
 
-\subsection{Índices}
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}p{3.4cm}p{2.4cm}L@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+\midrule
+\campo{\_id} & string & \campo{google}, \campo{microsoft} o \campo{mgn} \\
+\campo{nombre} & string & Nombre completo del dataset \\
+\campo{version} & string & Versión (v3, fecha de proceso de Microsoft, MGN2025) \\
+\campo{licencia} & string & CC BY-4.0, ODbL, etc. \\
+\campo{url\_descarga} & string & Origen exacto de los archivos \\
+\campo{periodo\_imagenes} & string & Fechas de las imágenes satelitales \\
+\campo{crs\_origen} & string & Sistema de referencia en que llegan los datos \\
+\campo{fecha\_descarga} & date & Cuándo se descargó \\
+\campo{n\_registros} & long & Registros cargados en la base \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Índices}\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}p{3.4cm}p{4.6cm}L@{}}
+\toprule
+\textbf{Colección} & \textbf{Índice} & \textbf{Para qué} \\
+\midrule
+\campo{municipios} & \campo{2dsphere} sobre \campo{geometry} & Consultas espaciales sobre los límites \\
+\campo{municipios} & \campo{subregion\_pdet.id} & Resúmenes por subregión \\
+\campo{edificios\_*} & \campo{2dsphere} sobre \campo{centroide} & Asignación con \campo{\$geoWithin} (consulta principal) \\
+\campo{edificios\_*} & \campo{2dsphere} sobre \campo{geometry} & \campo{\$geoIntersects} para analizar edificios en los límites \\
+\campo{edificios\_*} & \campo{cod\_mpio} & Agregación por municipio después de la asignación \\
+\campo{edificios\_*} & \campo{geom\_hash} (único) & Evitar duplicados entre particiones \\
+\campo{resultados} & \campo{\_id} compuesto & Búsqueda por municipio y fuente \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 % ------------------------------- Referencias -------------------------
 % =====================================================================

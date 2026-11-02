@@ -105,18 +105,101 @@
 \section{Plan de implementación}
 \label{sec:plan}
 
+El flujo tiene cinco fases que corren con un solo comando desde el
+repositorio (\campo{make all}). Cada fase lee sus parámetros de
+\campo{config.yaml} y deja su registro en la colección
+\campo{bitacora\_cargas}.
+
 \begin{enumerate}[leftmargin=*]
   \item \textbf{Infraestructura (semana 1)}
+  \begin{itemize}
+    \item Levantar MongoDB 8 con Docker Compose. La base de datos, los
+          volúmenes y las credenciales quedan versionados en el repositorio,
+          sin secretos.
+    \item Definir la estructura del repositorio: \campo{src/} (scripts por
+          fase), \campo{config.yaml}, \campo{notebooks/} (EDA), \campo{docs/}
+          (informes) y \campo{Makefile}.
+    \item Crear las colecciones con validación de esquema
+          (\campo{\$jsonSchema}) a partir del diccionario de la
+          sección~\ref{sec:diccionario}.
+  \end{itemize}
 
   \item \textbf{Límites PDET (semana 2)}
+  \begin{itemize}
+    \item Descargar el MGN 2025 del geoportal del DANE con un script que
+          guarda la URL, la fecha y el checksum del archivo.
+    \item Leer la capa municipal y cruzarla con \campo{MunicipiosPDET.xlsx}.
+          Los códigos DANE del Excel vienen como números, así que los de
+          Antioquia pierden el cero inicial (5045 en vez de 05045): se
+          rellenan a cinco dígitos antes del cruce.
+    \item Verificar que los 170 municipios crucen. Reparar las geometrías
+          inválidas con \campo{make\_valid}, reproyectar a WGS84 y revisar
+          que cada documento quede por debajo del límite de 16~MB de MongoDB.
+    \item Cargar los municipios en \campo{municipios} y crear el índice
+          \campo{2dsphere} sobre \campo{geometry}. Como evidencia del índice
+          se usa \campo{explain()}, que muestra la etapa \campo{IXSCAN}.
+  \end{itemize}
 
   \item \textbf{Huellas de edificios (semana 3)}
+  \begin{itemize}
+    \item Descargar solo lo necesario: las teselas de Google que tocan
+          Colombia y las particiones \campo{RegionName=Colombia} de Microsoft.
+    \item Prefiltrar con DuckDB o GeoPandas por el rectángulo envolvente de
+          los municipios PDET, para no cargar todo el país.
+    \item Por cada edificio: validar la geometría, calcular el centroide,
+          calcular \campo{area\_m2} en la proyección EPSG:9377 y generar
+          \campo{geom\_hash}
+          para detectar duplicados entre particiones.
+    \item Hacer la carga masiva con \campo{insert\_many(ordered=False)} en
+          lotes de tamaño configurable. Los índices se crean después de
+          cargar, porque construirlos sobre una colección llena es más rápido
+          que mantenerlos inserción por inserción.
+    \item Hacer un EDA por fuente: número de edificios, distribución de
+          áreas, distribución de \campo{confidence} (Google) y comparación
+          entre \campo{area\_in\_meters} y nuestra \campo{area\_m2}.
+  \end{itemize}
 
   \item \textbf{Análisis espacial (semana 4)}
+  \begin{itemize}
+    \item Asignar cada edificio a un solo municipio con la \textbf{regla del
+          centroide}: el edificio pertenece al municipio que contiene su
+          centroide (\campo{\$geoWithin} sobre \campo{centroide}). Así un
+          techo que cruza el límite entre dos municipios no se cuenta dos
+          veces.
+    \item Agregar por municipio y fuente con \campo{\$group} y escribir en
+          \campo{resultados} con \campo{\$merge}. Las métricas son: número de
+          edificios, área total de techos, área media, densidad
+          (edificios/km\textsuperscript{2}) y porcentaje del municipio
+          cubierto por techos.
+    \item Parametrizar el umbral de confianza de Google (por defecto 0,65, el
+          mínimo del dataset) y repetir el cálculo con 0,70 y 0,75 para medir
+          la sensibilidad.
+    \item Validar con un cruce espacial independiente en GeoPandas sobre una
+          muestra de municipios. Los conteos deben coincidir con los de
+          MongoDB.
+  \end{itemize}
 
   \item \textbf{Resultados e informe (semana 4)}
-
+  \begin{itemize}
+    \item Exportar tablas por municipio y por subregión. Hacer mapas
+          coropléticos del área de techos por municipio para cada fuente y un
+          mapa de la diferencia entre fuentes.
+    \item Proponer un ranking de municipios candidatos para los pilotos
+          solares, con la discusión de por qué difieren las fuentes.
+  \end{itemize}
 \end{enumerate}
+
+El área de techo de cada edificio se aproxima con el área de su huella en
+planta, que es lo que entregan ambos datasets. Para cada municipio $m$ y
+fuente $f$:
+
+\begin{equation}
+  A_{m,f} = \sum_{e \in E_f,\; \mathrm{centroide}(e) \in m} \mathrm{area}_{9377}(e)
+  \label{eq:area}
+\end{equation}
+
+donde $E_f$ es el conjunto de edificios de la fuente $f$ y
+$\mathrm{area}_{9377}(e)$ es el área de la huella $e$ calculada en EPSG:9377.
 
 % =====================================================================
 % 4. Diseño del esquema

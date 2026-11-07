@@ -1,0 +1,35 @@
+database:
+  uri_env_var: MONGO_URI   # la URI real vive en .env, nunca aquí
+  name: upme_solar
+  collections:
+    municipios: municipios
+    edificios_google: edificios_google
+    edificios_microsoft: edificios_microsoft
+    fuentes: fuentes
+    resultados: resultados
+    bitacora_cargas: bitacora_cargas
+
+crs:
+  almacenamiento: EPSG:4326   # WGS84, requerido por GeoJSON / 2dsphere
+  calculo_areas: EPSG:9377    # MAGNA-SIRGAS Origen Nacional
+
+fuentes:
+  mgn:
+    descripcion: "Marco Geoestadístico Nacional 2025 - DANE, nivel municipio"
+    url_descarga: "https://geoportal.dane.gov.co/servicios/descarga-y-metadatos/datos-geoestadisticos/?cod=111"
+    destino_local: data/raw/mgn_2025/
+  pdet:
+    descripcion: "Listado oficial de los 170 municipios PDET"
+    archivo: data/raw/MunicipiosPDET.xlsx
+  google_open_buildings:
+    destino_local: data/raw/google_open_buildings/
+  microsoft_building_footprints:
+    destino_local: data/raw/microsoft_building_footprints/
+
+municipios:
+  salida_geojson: data/processed/municipios_pdet.geojson
+  max_bson_bytes: 16000000   # límite de documento de MongoDB
+
+edificios:
+  umbral_confianza_google_default: 0.65
+  tamano_lote_insercion: 5000

@@ -27,7 +27,7 @@ from shapely.geometry.polygon import orient
 RAIZ = Path(__file__).resolve().parents[2]
 
 RUTAS_POR_DEFECTO = {
-    "intermedio_cruce": "data/processed/municipios_pdet_cruce.gpkg",
+    "intermedio_cruce": "data/processed/municipios_cruzados.gpkg",
     "intermedio_validado": "data/processed/municipios_pdet_validado.gpkg",
     "intermedio_geometria": "data/processed/municipios_pdet_geometria.gpkg",
     "reporte_geometrias": "data/processed/reporte_geometrias.csv",
@@ -99,8 +99,7 @@ def validar_y_reparar(gdf: gpd.GeoDataFrame | None = None) -> gpd.GeoDataFrame:
         entrada = ruta(cfg, "intermedio_cruce")
         if not entrada.exists():
             raise FileNotFoundError(
-                f"No existe {entrada}. cruce.py (Jorge) debe guardar ahí los "
-                "municipios PDET cruzados con el MGN."
+                f"No existe {entrada}. Corre antes descarga.py y cruce.py (Jorge)."
             )
         gdf = gpd.read_file(entrada)
 

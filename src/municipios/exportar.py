@@ -33,9 +33,9 @@ from src.municipios.geometria import cargar_config, ruta
 CANDIDATOS = {
     "cod_mpio": ["cod_mpio", "mpio_cdpmp", "codigo_dane", "cod_dane",
                  "codigo dane municipio"],
-    "nombre": ["nombre", "mpio_cnmbr", "municipio"],
+    "nombre": ["nombre_pdet", "nombre", "mpio_cnmbr", "nombre_mgn", "municipio"],
     "cod_dpto": ["cod_dpto", "dpto_ccdgo", "codigo dane departamento"],
-    "departamento": ["departamento", "dpto_cnmbr"],
+    "departamento": ["departamento_pdet", "departamento", "dpto_cnmbr"],
     "subregion": ["subregion_pdet", "subregion", "subregion pdet"],
 }
 

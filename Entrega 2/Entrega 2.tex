@@ -101,17 +101,160 @@
 \label{sec:contexto}
 
 Esta entrega corresponde a la \textbf{semana 2} del plan de implementación
-definido en la Entrega 1 (sección~3): cargar los límites de los 170
-municipios PDET en MongoDB y dejar evidencia del índice espacial que soporta
-las consultas sobre ellos. El diseño del esquema, el diagrama E-R y el
-diccionario de datos no cambian respecto a la Entrega 1 y no se repiten aquí;
-se referencian cuando hace falta.
+definido en la Entrega 1: cargar los límites de los 170 municipios PDET en
+MongoDB y dejar evidencia del índice espacial que soporta las consultas sobre
+ellos. Para que el informe se pueda leer por sí solo, las secciones
+\ref{sec:plan} y \ref{sec:modelo} resumen el plan de implementación y el modelo
+de datos (E-R y diccionario) de las colecciones que se usan esta semana,
+indicando qué cambió respecto a la Entrega 1.
 
 El flujo de esta semana tiene cuatro pasos encadenados por
 \campo{src/municipios/run.py} (lo que corre \campo{make municipios}):
 descargar el MGN 2025, cruzarlo con \campo{MunicipiosPDET.xlsx}, validar y
 reparar las geometrías, y finalmente crear las colecciones, cargarlas e
-indexarlas en MongoDB. 
+indexarlas en MongoDB.
+
+% =====================================================================
+% Plan de implementación
+% =====================================================================
+\section{Plan de implementación}
+\label{sec:plan}
+
+El proyecto avanza en cuatro semanas; cada fase lee sus parámetros de
+\campo{config.yaml} y registra su ejecución en \campo{bitacora\_cargas}.
+La tabla~\ref{tab:plan} resume el plan y el estado actual.
+
+\begin{table}[H]
+  \centering
+  \caption{Plan de implementación y estado.}
+  \label{tab:plan}
+  \begin{tabularx}{\textwidth}{l L L l}
+    \toprule
+    Semana & Fase & Resultado principal & Estado \\
+    \midrule
+    1 & Infraestructura & MongoDB 8 en Docker, estructura del repositorio y
+        configuración & Hecha \\
+    2 & Límites PDET & 170 municipios cargados, validados e indexados
+        (\campo{2dsphere}) & \textbf{Esta entrega} \\
+    3 & Huellas de edificios & Google Open Buildings y Microsoft Building
+        Footprints cargados, con índices & Pendiente \\
+    4 & Análisis e informe & Asignación por centroide, agregación en
+        \campo{resultados}, mapas y ranking & Pendiente \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\textbf{Metodología de la semana 2.} Cada paso es un módulo de
+\campo{src/municipios/} y se comunica con el siguiente por archivos en
+\campo{data/processed/}, de modo que se puede correr por separado:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Descarga} del MGN 2025 (DANE), con registro de URL, fecha y
+        SHA-256 en \campo{fuentes} (sección~\ref{sec:descarga-mgn}).
+  \item \textbf{Cruce y verificación} contra el listado oficial de 170
+        municipios, rellenando los códigos DANE a 5 dígitos
+        (sección~\ref{sec:descarga-cruce}).
+  \item \textbf{Validación, reparación y reproyección} de geometrías, con
+        área calculada en EPSG:9377 y almacenamiento en EPSG:4326
+        (sección~\ref{sec:geometria}).
+  \item \textbf{Esquema, carga e índices} en MongoDB: colecciones con
+        \campo{\$jsonSchema}, carga idempotente (upsert) e índices
+        \campo{2dsphere} y \campo{subregion\_pdet.id}
+        (sección~\ref{sec:samuel}).
+  \item \textbf{Evidencia y control}: \campo{explain()} con \campo{IXSCAN},
+        mapa de control y chequeo del límite de 16\,MB por documento
+        (secciones~\ref{sec:samuel-evidencia} y~\ref{sec:mapa}).
+\end{enumerate}
+
+\textbf{Organización del equipo.} Una rama y un pull request por persona y por
+tarea, con revisión cruzada antes del merge a \campo{main}. Las tareas se
+repartieron por archivo: descarga, cruce y verificación (Jorge); geometría y
+exportación (Maria Camila); esquema, carga, índices y evidencia (Samuel); mapa y
+chequeo de calidad (Jose Eduardo).
+
+% =====================================================================
+% Modelo de datos
+% =====================================================================
+\section{Modelo de datos}
+\label{sec:modelo}
+
+El esquema completo (cinco colecciones) se diseñó en la Entrega 1. La
+figura~\ref{fig:er} lo reproduce; esta semana solo se pueblan
+\campo{municipios}, \campo{fuentes} y \campo{bitacora\_cargas}. Las demás
+(\campo{edificios\_google}, \campo{edificios\_microsoft} y
+\campo{resultados}) se crean en las semanas 3 y 4.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{img/diagrama_er.png}
+  \caption{Diagrama E-R del esquema en MongoDB (notación pata de gallo). Los
+  edificios referencian al municipio por \campo{cod\_mpio}, asignado con una
+  consulta espacial; \campo{subregion\_pdet} y \campo{calidad} son
+  subdocumentos embebidos.}
+  \label{fig:er}
+\end{figure}
+
+Decisiones de modelado relevantes: la subregión PDET va \emph{embebida} en el
+municipio (dato pequeño, estable y siempre leído junto con él); los edificios
+van \emph{referenciados}, no embebidos, porque un municipio puede tener miles
+y superarían los 16\,MB por documento; y hay una colección por fuente de
+edificios para cargarlas, reindexarlas y compararlas por separado.
+
+\subsection{Diccionario de datos: \texorpdfstring{\campo{municipios}}{municipios}}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}p{3cm}p{3.6cm}Lp{2.6cm}@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} & \textbf{Origen} \\
+\midrule
+\campo{\_id} & string & Código DANE a 5 dígitos (\campo{05045}) & MGN / Excel PDET \\
+\campo{nombre} & string & Nombre del municipio & MGN \\
+\campo{cod\_dpto} & string & Código DANE del departamento & MGN \\
+\campo{departamento} & string & Nombre del departamento & MGN \\
+\campo{subregion\_pdet} & objeto \{id: int, nombre: string\} & Subregión PDET (una de 16), embebida & Excel PDET \\
+\campo{area\_km2} & double & Área del municipio & Calculado (EPSG:9377) \\
+\campo{geometry} & GeoJSON Polygon o MultiPolygon & Límite municipal (WGS84) & MGN reproyectado \\
+\campo{calidad} & objeto \{valida, reparada: bool; n\_vertices: int\} & Resultado de la validación & Calculado \\
+\campo{fuente\_id} & string & Referencia a \campo{fuentes} (\campo{mgn}) & Calculado \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Diccionario de datos: \texorpdfstring{\campo{fuentes}}{fuentes} y \texorpdfstring{\campo{bitacora\_cargas}}{bitacora\_cargas}}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}p{3.6cm}p{2.6cm}L@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{\campo{fuentes}}} \\
+\campo{\_id} & string & \campo{mgn} (esta semana), \campo{google} o \campo{microsoft} \\
+\campo{nombre}, \campo{version}, \campo{licencia} & string & Identificación del dataset \\
+\campo{url\_descarga} & string & Origen exacto del archivo \\
+\campo{crs\_origen} & string & Sistema de referencia leído del \campo{.prj} \\
+\campo{fecha\_descarga} & date & Cuándo se descargó \\
+\campo{checksum\_sha256} & string & SHA-256 del archivo descargado \\
+\campo{periodo\_imagenes} & string o null & Fechas de imágenes; \emph{no aplica al MGN} \\
+\campo{n\_registros} & long o null & Se completa en \campo{carga.py} tras insertar \\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{\campo{bitacora\_cargas}}} \\
+\campo{etapa} & string & \campo{descarga}, \campo{carga}, \campo{indices}, \dots \\
+\campo{inicio}, \campo{fin} & date & Duración de la etapa \\
+\campo{registros\_ok}, \campo{registros\_error} & long & Resultado de la etapa \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Cambios respecto a la Entrega 1.} En \campo{fuentes},
+\campo{periodo\_imagenes} y \campo{n\_registros} pasaron a aceptar \campo{null}
+(sección~\ref{sec:samuel-schema}), y se agregó \campo{checksum\_sha256} para registrar
+el SHA-256 de la descarga. \textbf{Índices de esta semana:}
+\campo{2dsphere} sobre \campo{municipios.geometry} (consultas espaciales) e
+índice simple sobre \campo{municipios.subregion\_pdet.id} (resúmenes por
+subregión).
+
 % =====================================================================
 % 2. Descarga y cruce con PDET (Jorge)
 % =====================================================================

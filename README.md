@@ -10,7 +10,19 @@ Footprints) sobre los límites municipales oficiales del DANE (MGN 2025), con
 MongoDB e índices espaciales.
 
 El diseño completo (plan de implementación, diagrama E-R y diccionario de
-datos) está en [`Entrega 1/Entrega 1.pdf`](<Entrega 1/Entrega 1.pdf>).
+datos) está en [`Entrega 1/Entrega 1.pdf`](<Entrega 1/Entrega 1.pdf>). La carga de
+municipios, los índices espaciales y su evidencia están en
+[`Entrega 2/Entrega 2.pdf`](<Entrega 2/Entrega 2.pdf>), que también resume el plan y el
+modelo de datos.
+
+## Estado
+
+| Semana | Fase | Estado |
+|---|---|---|
+| 1 | Infraestructura (Docker, esquema `$jsonSchema`) | Hecha |
+| 2 | Límites PDET: 170 municipios cargados e indexados | Hecha (Entrega 2) |
+| 3 | Huellas de edificios (Google y Microsoft) | Pendiente |
+| 4 | Asignación por centroide, resultados e informe | Pendiente |
 
 ## Cómo correr el proyecto
 
@@ -26,6 +38,11 @@ make schema                     # crea las colecciones con $jsonSchema (semana 1
 make municipios                 # descarga, valida y carga los municipios PDET (semana 2)
 ```
 
+El MGN 2025 no tiene enlace directo y estable: descarga `MGN2025_MPIO_GRAFICO.zip`
+del [geoportal del DANE](https://geoportal.dane.gov.co/servicios/descarga-y-metadatos/datos-geoestadisticos/?cod=111),
+guárdalo como `data/raw/mgn_2025/MGN2025.zip` (o define `MGN_URL_DIRECTA` en `.env`).
+El SHA-256 queda registrado en la colección `fuentes`.
+
 `make down` apaga el contenedor. `make shell` abre `mongosh` contra la base.
 
 ## Estructura del repositorio
@@ -37,8 +54,10 @@ src/
   edificios/   semana 3: huellas de edificios
   analisis/    semana 4: asignación y agregación de resultados
 config.yaml    parámetros de cada fase (CRS, fuentes, nombres de colecciones)
-data/          datos crudos y procesados (no se versionan, ver .gitignore)
-docs/          informes de cada entrega
+data/          datos crudos y procesados (ignorados por git, salvo las excepciones de abajo)
+docs/          evidencia generada (mapa de control)
+scripts/       utilidades sueltas (chequeo_bson.py)
+Entrega N/     informe en LaTeX y PDF de cada entrega
 notebooks/     EDA
 ```
 
@@ -58,9 +77,12 @@ notebooks/     EDA
 | `mapa.py` | Mapa de control | Jose Eduardo |
 | `calidad.py` | Chequeo de tamaño BSON | Jose Eduardo |
 
-`run.py` encadena todo en orden (es lo que corre `make municipios`). `MunicipiosPDET.xlsx`
-no está en el repo todavía — hay que conseguirlo de los recursos del curso y ponerlo
-en `data/raw/` antes de que Jorge pueda empezar `cruce.py`.
+`run.py` encadena todo en orden (es lo que corre `make municipios`).
+
+Datos versionados a propósito (el resto de `data/` está en `.gitignore`):
+`data/raw/MunicipiosPDET.xlsx` (insumo pequeño y estable) y
+`data/processed/municipios_pdet.geojson` (salida final, ~37 MB), para que nadie
+tenga que volver a descargar el MGN solo para probar su parte.
 
 ## Flujo de trabajo del equipo
 

@@ -122,6 +122,147 @@ indexarlas en MongoDB.
 \section{Validación, reparación y reproyección de geometrías}
 \label{sec:geometria}
 
+Esta sección cubre \campo{geometria.py} y \campo{exportar.py}. Su entrada es
+la capa que deja el cruce (\campo{data/processed/municipios\_cruzados.gpkg},
+sección~\ref{sec:descarga}) y su salida es
+\campo{data/processed/municipios\_pdet.geojson}, el archivo que se carga en
+la colección \campo{municipios}. Como \campo{run.py} llama a cada paso sin
+pasarle datos, los pasos se comunican por archivos en
+\campo{data/processed/}, y cada uno puede volver a correrse por separado.
+
+\subsection{Validación y reparación}
+\label{sec:geometria-validacion}
+
+MongoDB rechaza un polígono inválido (por ejemplo, con bordes que se
+cruzan) en el momento de insertarlo en una colección con índice
+\campo{2dsphere}, así que la validez se revisa antes de la carga.
+\campo{validar\_y\_reparar()} recorre los 170 municipios y para cada uno:
+
+\begin{itemize}
+  \item Revisa \campo{is\_valid} con Shapely y, si la geometría es inválida,
+        guarda el motivo que reporta \campo{is\_valid\_reason}.
+  \item Repara las inválidas con \campo{shapely.make\_valid}. Como
+        \campo{make\_valid} puede devolver una colección con líneas o puntos
+        sueltos, se conservan solo las partes poligonales, para que el
+        resultado sea siempre \campo{Polygon} o \campo{MultiPolygon}, como
+        exige el diccionario de datos.
+  \item Registra el resultado en el subdocumento \campo{calidad}:
+        \campo{valida} (cómo venía de origen), \campo{reparada} (si hubo que
+        tocarla) y \campo{n\_vertices}.
+\end{itemize}
+
+Las 170 geometrías del MGN 2025 llegaron válidas, así que no fue necesario
+reparar ninguna. La reparación queda implementada y se aplica también
+después de reproyectar (sección~\ref{sec:geometria-reproyeccion}), donde el
+redondeo de coordenadas podría introducir errores mínimos.
+
+\subsection{Reproyección y cálculo de área}
+\label{sec:geometria-reproyeccion}
+
+Se usan dos sistemas de referencia, tal como se definió en la Entrega 1:
+
+\begin{itemize}
+  \item \textbf{Área en EPSG:9377} (MAGNA-SIRGAS Origen Nacional).
+        \campo{area\_km2} se calcula en esta proyección plana oficial, que
+        está en metros. Calcular el área en grados no tiene sentido físico.
+  \item \textbf{Almacenamiento en EPSG:4326} (WGS84). GeoJSON y los índices
+        \campo{2dsphere} exigen coordenadas \campo{[longitud, latitud]} en
+        WGS84. GeoPandas reproyecta con \campo{always\_xy=True}, así que el
+        orden queda correcto.
+\end{itemize}
+
+Después de reproyectar, \campo{reproyectar\_y\_calcular\_area()} aplica tres
+ajustes y dos controles:
+
+\begin{itemize}
+  \item Ajusta las coordenadas a una rejilla de $10^{-6}$ grados (unos
+        10\,cm) con \campo{shapely.set\_precision}, que reduce el tamaño del
+        archivo sin romper la validez, y elimina vértices repetidos.
+  \item Orienta los anillos según el estándar GeoJSON (RFC~7946): exterior
+        en sentido antihorario e interiores en sentido horario.
+  \item Cuenta los vértices de cada municipio (\campo{calidad.n\_vertices}).
+  \item \textbf{Control de orden lon/lat:} verifica que todas las
+        coordenadas caigan dentro del rectángulo de Colombia. Si la longitud
+        y la latitud quedaran invertidas, el script se detiene.
+  \item \textbf{Control de validez final:} vuelve a revisar
+        \campo{is\_valid} sobre las 170 geometrías ya reproyectadas.
+\end{itemize}
+
+Como verificación independiente, se comparó nuestra \campo{area\_km2} con
+el área oficial que trae el MGN en el campo \campo{mpio\_narea}. La
+diferencia máxima entre ambas fue de $2{,}2\times10^{-5}\,\%$ y el área total
+coincide (389.182\,km$^2$), lo que confirma que el cálculo en EPSG:9377 es
+correcto.
+
+\subsection{Exportación del GeoJSON}
+\label{sec:geometria-exportar}
+
+\campo{exportar.py} escribe un \campo{FeatureCollection} con un
+\campo{Feature} por municipio. Cada uno lleva en \campo{properties} los
+campos de la colección \campo{municipios} (Entrega 1, sección 5.1), de modo
+que \campo{carga.py} solo tiene que juntar \campo{properties} y
+\campo{geometry} en un documento. Antes de escribir, el script valida que
+no haya códigos DANE repetidos, que todos tengan 5 dígitos con el cero
+inicial y que solo haya geometrías \campo{Polygon} o \campo{MultiPolygon}.
+El identificador de la subregión (\campo{subregion\_pdet.id}, de 1 a 16)
+se asigna en orden alfabético, para que sea el mismo en cada ejecución.
+A diferencia de \campo{data/raw/}, este archivo sí se versiona en el
+repositorio, para que el resto del equipo no dependa de volver a
+descargar el MGN.
+
+\begin{lstlisting}[caption={Propiedades de un municipio en el GeoJSON exportado (se omite la geometría).}]
+{
+  "_id": "05031",
+  "nombre": "AMALFI",
+  "cod_dpto": "05",
+  "departamento": "ANTIOQUIA",
+  "subregion_pdet": { "id": 3, "nombre": "BAJO CAUCA Y NORDESTE ANTIOQUEÑO" },
+  "area_km2": 1208.3462,
+  "calidad": { "valida": true, "reparada": false, "n_vertices": 15106 },
+  "fuente_id": "mgn"
+}
+\end{lstlisting}
+
+\subsection{Resultados}
+\label{sec:geometria-resultados}
+
+\begin{table}[H]
+  \centering
+  \caption{Resultados de la validación, reproyección y exportación.}
+  \label{tab:geometria}
+  \begin{tabularx}{0.85\textwidth}{L r}
+    \toprule
+    Indicador & Valor \\
+    \midrule
+    Municipios procesados              & 170 \\
+    Geometrías válidas de origen       & 170 \\
+    Geometrías reparadas               & 0 \\
+    Área total de los municipios PDET  & 389.182\,km$^2$ \\
+    Municipio más grande               & Solano (Caquetá), 42.234\,km$^2$ \\
+    Municipio más pequeño              & Chalán (Sucre), 84\,km$^2$ \\
+    Vértices en total                  & 1.551.994 \\
+    Vértices del municipio más complejo & 51.568 (Solano) \\
+    Mediana de vértices por municipio  & 7.000 \\
+    Documento más pesado (Solano)      & 1,2\,MB (límite de MongoDB: 16\,MB) \\
+    Tamaño de \campo{municipios\_pdet.geojson} & 37,1\,MB \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+El documento más pesado ocupa 1,2\,MB, muy por debajo del límite de 16\,MB
+por documento de MongoDB, así que ningún municipio tuvo que simplificarse
+ni partirse. El detalle por municipio (validez, motivo, vértices y área)
+queda en \campo{data/processed/reporte\_geometrias.csv}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{img/cap_geometria.png}
+  \caption{Ejecución de \campo{geometria.py} y \campo{exportar.py}: 170
+  municipios revisados, ninguno inválido, y el GeoJSON exportado.}
+  \label{fig:cap-geometria}
+\end{figure}
+
+
 
 % =====================================================================
 % 4. Esquema, carga e índices (Samuel)

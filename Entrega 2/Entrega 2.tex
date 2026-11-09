@@ -57,6 +57,9 @@
 % --- Atajos ---------------------------------------------------------
 \newcommand{\campo}[1]{\texttt{#1}}
 \newcommand{\pendiente}[1]{\textcolor{gris}{\textit{[Pendiente -- #1]}}}
+% Ruta de archivo larga: igual que \campo pero se puede partir en / y _
+% (xurl ya amplía los puntos de corte de \url para que esto funcione).
+\newcommand{\ruta}[1]{\begingroup\urlstyle{tt}\url{#1}\endgroup}
 
 \begin{document}
 
@@ -85,7 +88,7 @@
   \vspace{3cm}
   {\large Profesor: Andrés Oswaldo Calderón Romero, Ph.D.\par}
   \vspace{3cm}
-  {\large \pendiente{fecha de entrega}\par}
+  {\large {Noviembre 8 de 2026}\par}
 \end{titlepage}
 
 \tableofcontents
@@ -115,6 +118,87 @@ indexarlas en MongoDB.
 \section{Descarga del MGN y cruce con PDET}
 \label{sec:descarga}
 
+Esta sección cubre \campo{descarga.py}, \campo{cruce.py} y
+\campo{verificacion.py}: traer el MGN 2025, quedarse solo con los
+municipios PDET y confirmar que los 170 cruzaron.
+
+\subsection{Descarga del MGN 2025}
+\label{sec:descarga-mgn}
+
+El geoportal del DANE genera la descarga desde una página web (no hay un
+enlace directo y estable al ZIP), así que \campo{descargar\_mgn()} admite
+dos formas de dar el archivo: uno ya puesto a mano en
+\ruta{data/raw/mgn_2025/}, o una URL directa opcional
+(\campo{MGN\_URL\_DIRECTA} en \campo{.env}). Para esta entrega se usó la
+primera opción, con el archivo descargado manualmente desde el Centro de
+Datos Geoestadísticos del DANE:
+
+\begin{itemize}
+  \item \textbf{Fuente:} \url{https://geoportal.dane.gov.co/servicios/descarga-y-metadatos/datos-geoestadisticos/?cod=111}
+  \item \textbf{Archivo:} \campo{MGN2025\_MPIO\_GRAFICO.zip} (MGN2025, nivel
+        municipio, formato Shapefile), renombrado localmente a
+        \campo{MGN2025.zip}.
+\end{itemize}
+
+El script calcula el SHA-256 del ZIP, lo descomprime en
+\ruta{data/raw/mgn_2025/extraido/} y registra la fuente en la colección
+\campo{fuentes} (\campo{\_id="mgn"}): URL de origen, versión, CRS leído del
+\campo{.prj} de la capa, fecha de descarga y el checksum. Esta ejecución
+quedó registrada con:
+
+\begin{lstlisting}[caption={Checksum verificado del ZIP descargado.}]
+SHA-256: a3c01393059be8f2947de5e0a828faa4c7a43119819a667a8124854340bc141f
+\end{lstlisting}
+
+\subsection{Cruce con MunicipiosPDET.xlsx}
+\label{sec:descarga-cruce}
+
+\campo{cruzar\_con\_pdet()} lee \ruta{data/raw/MunicipiosPDET.xlsx} (el
+listado oficial de los 170 municipios PDET) y la capa municipal completa del
+MGN, rellena los códigos DANE a 5 dígitos con ceros a la izquierda (varios
+municipios de Antioquia vienen sin el cero inicial en el Excel) y cruza
+ambas tablas por \campo{cod\_mpio}. El resultado es un
+\campo{GeoDataFrame} solo con los municipios PDET, que se guarda en
+\ruta{data/processed/municipios_cruzados.gpkg} para que
+\campo{geometria.py} lo use en el siguiente paso
+(sección~\ref{sec:geometria}).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{img/cap_cruce.png}
+  \caption{Ejecución de \campo{cruce.py}: localiza la capa municipal del MGN
+  y cruzan los 170 municipios PDET.}
+  \label{fig:cap-cruce}
+\end{figure}
+
+\subsection{Verificación de los 170 municipios}
+\label{sec:descarga-verificacion}
+
+\campo{verificar\_cobertura()} es un control independiente del cruce: vuelve
+a contar desde el Excel y la capa cruzada, para detectar si algún municipio
+PDET se quedó por fuera o si el Excel trae códigos repetidos.
+
+\begin{table}[H]
+  \centering
+  \caption{Tabla de control de \texttt{verificacion.py}.}
+  \label{tab:verificacion}
+  \begin{tabularx}{\textwidth}{L r r c}
+    \toprule
+    Verificación & Esperado & Obtenido & OK \\
+    \midrule
+    Municipios en el Excel (códigos únicos) & 170 & 170 & \checkmark \\
+    Códigos repetidos en el Excel           & 0   & 0   & \checkmark \\
+    Municipios que cruzaron con el MGN      & 170 & 170 & \checkmark \\
+    Subregiones PDET en el resultado        & 16  & 16  & \checkmark \\
+    Departamentos en el resultado           & 19  & 19  & \checkmark \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Los 170 municipios PDET cruzaron sin excepciones, en 16 subregiones y 19
+departamentos, tal como se definió en el Excel oficial. El detalle de
+control por municipio queda en
+\ruta{data/processed/verificacion_control.csv}.
 
 % =====================================================================
 % 3. Validación, reparación y reproyección (Maria Camila)
@@ -123,9 +207,9 @@ indexarlas en MongoDB.
 \label{sec:geometria}
 
 Esta sección cubre \campo{geometria.py} y \campo{exportar.py}. Su entrada es
-la capa que deja el cruce (\campo{data/processed/municipios\_cruzados.gpkg},
+la capa que deja el cruce de (\ruta{data/processed/municipios_cruzados.gpkg},
 sección~\ref{sec:descarga}) y su salida es
-\campo{data/processed/municipios\_pdet.geojson}, el archivo que se carga en
+\ruta{data/processed/municipios_pdet.geojson}, el archivo que se carga en
 la colección \campo{municipios}. Como \campo{run.py} llama a cada paso sin
 pasarle datos, los pasos se comunican por archivos en
 \campo{data/processed/}, y cada uno puede volver a correrse por separado.
@@ -190,7 +274,7 @@ ajustes y dos controles:
 
 Como verificación independiente, se comparó nuestra \campo{area\_km2} con
 el área oficial que trae el MGN en el campo \campo{mpio\_narea}. La
-diferencia máxima entre ambas fue de $2{,}2\times10^{-5}\,\%$ y el área total
+diferencia máxima entre ambas fue de $2{,}2\times10^{-5}$\,\% y el área total
 coincide (389.182\,km$^2$), lo que confirma que el cálculo en EPSG:9377 es
 correcto.
 
@@ -243,16 +327,18 @@ descargar el MGN.
     Vértices en total                  & 1.551.994 \\
     Vértices del municipio más complejo & 51.568 (Solano) \\
     Mediana de vértices por municipio  & 7.000 \\
-    Documento más pesado (Solano)      & 1,2\,MB (límite de MongoDB: 16\,MB) \\
+    Documento más pesado (Solano)      & 1,74\,MB (límite de MongoDB: 16\,MB) \\
     Tamaño de \campo{municipios\_pdet.geojson} & 37,1\,MB \\
     \bottomrule
   \end{tabularx}
 \end{table}
 
-El documento más pesado ocupa 1,2\,MB, muy por debajo del límite de 16\,MB
-por documento de MongoDB, así que ningún municipio tuvo que simplificarse
-ni partirse. El detalle por municipio (validez, motivo, vértices y área)
-queda en \campo{data/processed/reporte\_geometrias.csv}.
+El documento más pesado ocupa 1,74\,MB (10,9\,\% del límite), muy por debajo
+del límite de 16\,MB por documento de MongoDB, así que ningún municipio tuvo
+que simplificarse ni partirse. Este tamaño se confirma de forma
+independiente con \campo{calidad.py} (sección~\ref{sec:mapa-calidad}) y con
+\campo{scripts/chequeo\_bson.py}. El detalle por municipio (validez, motivo,
+vértices y área) queda en \campo{data/processed/reporte\_geometrias.csv}.
 
 \begin{figure}[H]
   \centering
@@ -284,13 +370,27 @@ evidencia de que funciona contra una base MongoDB real.
 Entrega 1 (sección 5): campos requeridos, tipos BSON y, para
 \campo{subregion\_pdet} y \campo{calidad}, la forma exacta de los
 subdocumentos embebidos. Si la colección ya existe (por ejemplo al volver a
-correr \campo{make schema}), usa \campo{collMod} en vez de
-\campo{create\_collection} para no fallar.
+correr \campo{make schema}), \campo{create\_collection} lanza
+\campo{CollectionInvalid} y el script lo captura sin fallar: no se toca el
+validador ni los datos que ya haya, para no arriesgarse a reescribir un
+esquema en uso sin coordinarlo antes con el equipo.
+
+En \campo{fuentes}, \campo{periodo\_imagenes} y \campo{n\_registros} aceptan
+\campo{null} además de su tipo. \newline\campo{periodo\_imagenes} no aplica al MGN
+(es un límite administrativo, no una imagen satelital con fecha de captura),
+y \campo{n\_registros} es un dato calculado: \campo{descarga.py} todavía no
+sabe cuántos municipios van a cargarse cuando registra la fuente, así que
+\campo{carga.py} lo completa después de insertar (sección~\ref{sec:samuel-carga}).
+Con el validador original, estrictamente igual al diccionario de datos, la
+inserción de \campo{descarga.py} fallaba con el error 121 apenas se intentaba
+registrar la fuente \campo{mgn}.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{img/cap_schema.png}
-  \caption{Ejecución de \campo{schema.py}: crea ambas colecciones sin errores.}
+  \caption{Ejecución de \campo{schema.py}: crea ambas colecciones sin
+  errores. Al volver a correrlo con las colecciones ya creadas, el script
+  detecta que existen y no las modifica.}
   \label{fig:cap-schema}
 \end{figure}
 
@@ -306,14 +406,127 @@ con el código de error 121 y lista los campos que faltan.
   \label{fig:cap-validacion}
 \end{figure}
 
-\
+\subsection{Carga idempotente con PyMongo}
+\label{sec:samuel-carga}
+
+\campo{carga.py} lee \campo{data/processed/municipios\_pdet.geojson} (la
+salida de \campo{exportar.py}, sección~\ref{sec:geometria-exportar}) y arma
+un documento por \campo{Feature}: las \campo{properties} más \campo{geometry}.
+En vez de \campo{insert\_many}, usa \campo{bulk\_write} con una operación
+\campo{UpdateOne(\{\_id: ...\}, \{\$set: doc\}, upsert=True)} por municipio,
+así que volver a correrlo no duplica documentos ni falla si alguno ya existe;
+simplemente lo deja igual o lo actualiza. Al terminar, actualiza
+\campo{fuentes.mgn.n\_registros} con el total cargado y registra la
+ejecución en \campo{bitacora\_cargas} (\campo{etapa="carga"}, con
+\campo{inicio}, \campo{fin}, \campo{registros\_ok} y \campo{registros\_error}).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{img/cap_carga.png}
+  \caption{Ejecución de \campo{carga.py}: los 170 municipios quedan en la
+  colección.}
+  \label{fig:cap-carga}
+\end{figure}
+
+\subsection{Índices espaciales}
+\label{sec:samuel-indices}
+
+\campo{indices.py} crea dos índices sobre \campo{municipios}, los que pide
+el diccionario de datos (Entrega 1, sección 5.5): \campo{2dsphere} sobre
+\campo{geometry}, para las consultas espaciales (\campo{\$geoIntersects},
+\campo{\$geoWithin}) que se usarán en las entregas 3 y 4 para asignar
+edificios a municipios, y un índice simple sobre \campo{subregion\_pdet.id}
+para los resúmenes por subregión.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{img/cap_indices.png}
+  \caption{Ejecución de \campo{indices.py}: \campo{geometry\_2dsphere} y
+  \campo{subregion\_pdet.id\_1} creados.}
+  \label{fig:cap-indices}
+\end{figure}
+
+\subsection{Evidencia del índice espacial}
+\label{sec:samuel-evidencia}
+
+\campo{evidencia.py} prueba que el índice \campo{2dsphere} realmente se usa,
+no que simplemente exista. Toma un punto interior de un municipio del GeoJSON
+exportado (\campo{representative\_point()} de Shapely, que cae dentro del
+polígono aunque sea cóncavo) y corre una consulta \campo{\$geoIntersects}
+con ese punto. Dos verificaciones:
+
+\begin{itemize}
+  \item \campo{.explain()} sobre la consulta: las etapas del plan ganador
+        deben incluir \campo{IXSCAN} y no \campo{COLLSCAN}, es decir, que
+        Mongo usó el índice en vez de revisar las 170 geometrías una por una.
+  \item El resultado de la consulta debe ser exactamente un municipio, y debe
+        ser el mismo del que se tomó el punto.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{img/cap_evidencia.png}
+  \caption{\campo{evidencia.py}: el plan usa \campo{IXSCAN} y
+  \campo{\$geoIntersects} devuelve el municipio correcto para el punto de
+  control.}
+  \label{fig:cap-evidencia}
+\end{figure}
+
 % =====================================================================
 % 5. Mapa y control de calidad (Jose Eduardo)
 % =====================================================================
 \section{Mapa de control y chequeo de calidad}
 \label{sec:mapa}
 
+Esta sección cubre \campo{mapa.py} (t04) y \campo{calidad.py} (t07): una
+evidencia visual de que los 170 municipios y sus 16 subregiones quedaron
+correctos, y la confirmación de que ningún documento se acerca al límite de
+16\,MB de MongoDB antes de cargarlos.
 
+\subsection{Mapa de control}
+\label{sec:mapa-control}
+
+\campo{generar\_mapa\_control()} lee
+\ruta{data/processed/municipios_pdet.geojson} (la salida de
+\campo{exportar.py}, sección~\ref{sec:geometria-exportar}) y dibuja los 170
+municipios con GeoPandas y Matplotlib, coloreados por subregión PDET. Sirve
+como control visual rápido: si faltara un municipio o alguno quedara con una
+geometría rota, se notaría de inmediato en el mapa. El archivo se guarda en
+\ruta{docs/mapa_control_municipios.png}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{img/cap_mapa.png}
+  \caption{Los 170 municipios PDET coloreados por sus 16 subregiones.}
+  \label{fig:cap-mapa}
+\end{figure}
+
+El mapa confirma lo que ya mostró la tabla de control de
+\campo{verificacion.py} (sección~\ref{sec:descarga-verificacion}): los 170
+municipios están completos y agrupados en las 16 subregiones esperadas, sin
+huecos ni geometrías sueltas fuera de su región.
+
+\subsection{Chequeo de tamaño BSON}
+\label{sec:mapa-calidad}
+
+MongoDB rechaza cualquier documento que supere 16\,MB. \campo{chequear\_tamanos()}
+mide, para cada municipio, el tamaño BSON exacto del documento tal como lo
+guarda \campo{carga.py} (\campo{properties} más \campo{geometry}), usando
+\campo{bson.encode()} directamente en vez de estimar por el tamaño del
+GeoJSON en disco. Reporta el municipio más pesado y marca con una alerta
+cualquiera que pase el 90\,\% del límite (\campo{config.yaml ->
+municipios.max\_bson\_bytes}); si alguno superara el 100\,\%, el script
+falla para que no se intente cargar.
+
+\begin{lstlisting}[caption={Salida de \texttt{calidad.py} sobre los 170 municipios PDET.}]
+[calidad] 170 documentos; el mayor es 18756 con 1742528 bytes (10.9% del límite de 16000000).
+\end{lstlisting}
+
+El municipio más pesado es Solano (Caquetá, código DANE 18756) con
+1.742.528 bytes (10,9\,\% del límite), coherente con ser también el
+municipio con más vértices (sección~\ref{sec:geometria-resultados}). Ningún
+municipio se acercó al umbral de alerta del 90\,\%, así que no hizo falta
+simplificar ninguna geometría para esta entrega.
 
 % =====================================================================
 % 6. Conclusiones y próximos pasos
@@ -321,6 +534,48 @@ con el código de error 121 y lista los campos que faltan.
 \section{Conclusiones y próximos pasos}
 \label{sec:conclusiones}
 
+El objetivo de esta entrega era cargar los 170 municipios PDET en MongoDB
+con evidencia de que las consultas espaciales usan el índice, y se cumplió
+de punta a punta: los 170 municipios del MGN 2025 cruzaron con el listado
+oficial sin excepciones (16 subregiones, 19 departamentos), sus geometrías
+llegaron válidas (ninguna necesitó repararse), y el GeoJSON exportado
+(37,1\,MB, documento más pesado 1,74\,MB) se cargó completo en la colección
+\campo{municipios} con los índices \campo{2dsphere} y
+\campo{subregion\_pdet.id}. La evidencia de
+\campo{evidencia.py} (sección~\ref{sec:samuel-evidencia}) confirma que una
+consulta \campo{\$geoIntersects} resuelve con \campo{IXSCAN}, no con un
+recorrido completo de la colección, y el mapa de control
+(sección~\ref{sec:mapa-control}) deja ver los 170 municipios agrupados
+correctamente en sus subregiones.
 
+El flujo completo quedó encadenado en \campo{src/municipios/run.py}, de
+modo que \campo{make \newline municipios} reproduce todo el proceso --descarga,
+cruce, verificación, geometría, esquema, carga, índices y evidencia-- desde
+cero. Los únicos datos que se versionan son
+\ruta{data/raw/MunicipiosPDET.xlsx} (insumo pequeño y estable) y
+\ruta{data/processed/municipios_pdet.geojson} (la salida final, 37\,MB),
+para que ningún integrante del equipo dependa de volver a descargar el MGN
+completo solo para probar su parte.
+
+Como aprendizajes del proceso: el validador \campo{\$jsonSchema} derivado
+del diccionario de datos solo tiene sentido si los campos \emph{calculados en otra etapa}
+(como \campo{fuentes.n\_registros}) se declaran opcionales o nulos, porque
+exigirlos desde el primer insert bloquea el flujo por el que se van
+completando los datos (sección~\ref{sec:samuel-schema}); y separar cada
+tarea en su propio archivo de \campo{src/municipios/}, comunicándose por
+archivos intermedios en \campo{data/processed/}, permitió que las cuatro
+personas trabajaran en paralelo sin bloquearse, a costa de tener que
+coordinar manualmente el orden de \campo{run.py} cuando una etapa pasó a
+depender de la salida de otra (como ocurrió con \campo{calidad.py}, que
+necesita el GeoJSON que deja \campo{exportar.py}).
+
+Para la semana 3 (huellas de edificios), el plan de implementación de la
+Entrega 1 define el siguiente paso: descargar y prefiltrar Google Open
+Buildings y Microsoft Building Footprints recortados al área de los 170
+municipios PDET (usando el \campo{geometry} y el índice \campo{2dsphere}
+que ya quedaron listos en esta entrega), cargar \campo{edificios\_google} y
+\campo{edificios\_microsoft}, y dejar los índices \campo{2dsphere} sobre
+\campo{centroide} y \campo{geometry} que se usarán para asignar cada
+edificio a su municipio.
 
 \end{document}

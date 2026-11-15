@@ -25,6 +25,8 @@ fuentes:
     destino_local: data/raw/google_open_buildings/
   microsoft_building_footprints:
     destino_local: data/raw/microsoft_building_footprints/
+    url_indice: https://minedbuildings.z5.web.core.windows.net/global-buildings/dataset-links.csv
+    region: Colombia
 
 municipios:
   salida_geojson: data/processed/municipios_pdet.geojson
@@ -33,3 +35,8 @@ municipios:
 edificios:
   umbral_confianza_google_default: 0.65
   tamano_lote_insercion: 5000
+  procesos: 8                # procesos en paralelo para limpiar archivos
+  descargas_paralelas: 8
+  salida_parquet:
+    google: data/processed/edificios_google.parquet
+    microsoft: data/processed/edificios_microsoft.parquet

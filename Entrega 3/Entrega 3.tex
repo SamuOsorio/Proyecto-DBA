@@ -857,6 +857,34 @@ con menos edificios en Google (20\,722), pero no en Microsoft (37\,692). Eso ya 
 una señal de que las dos fuentes no cubren el territorio igual
 (figura~\ref{fig:eda-subregion}).
 
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}Lrr@{}}
+\toprule
+\textbf{Subregión PDET} & \textbf{Google} & \textbf{Microsoft} \\
+\midrule
+Sierra Nevada - Perijá & 645\,009 & 295\,383 \\
+Alto Patía y Norte del Cauca & 388\,378 & 271\,668 \\
+Urabá Antioqueño & 218\,242 & 113\,400 \\
+Montes de María & 215\,874 & 129\,388 \\
+Cuenca del Caguán y Piedemonte Caqueteño & 182\,694 & 133\,941 \\
+Bajo Cauca y Nordeste Antioqueño & 142\,783 & 102\,406 \\
+Putumayo & 136\,711 & 108\,450 \\
+Pacífico Medio & 116\,255 & 49\,596 \\
+Sur de Córdoba & 114\,887 & 80\,634 \\
+Macarena - Guaviare & 113\,455 & 94\,110 \\
+Arauca & 111\,739 & 74\,675 \\
+Catatumbo & 104\,277 & 89\,633 \\
+Sur de Bolívar & 80\,076 & 52\,856 \\
+Pacífico y Frontera Nariñense & 71\,020 & 79\,144 \\
+Sur del Tolima & 32\,662 & 48\,072 \\
+Chocó & 20\,722 & 37\,692 \\
+\bottomrule
+\end{tabularx}
+\caption{Edificios por subregión PDET, según la asignación por centroide.}
+\label{tab:eda-subregion}
+\end{table}
+
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.3\textheight,keepaspectratio]{img/eda_subregion.png}
@@ -900,6 +928,24 @@ huecos de Google se concentran, así, en el Chocó y el Atrato antioqueño.
   \label{fig:eda-mapa}
 \end{figure}
 
+\subsection{Verificación}
+
+Como el repositorio no tiene pruebas automáticas, la verificación del EDA se
+apoya en cuatro comprobaciones. Los conteos del notebook (2\,694\,786 y
+1\,761\,048) coinciden con los documentos de MongoDB. No hay \campo{geom\_hash}
+duplicados en ninguna fuente. El notebook se ejecutó de punta a punta sobre los
+datos completos sin errores. Y la corrida desde cero de \campo{make edificios}
+reprodujo las mismas cifras.
+
+\subsection{Entorno de ejecución}
+
+El EDA y el flujo se corrieron en macOS con Python~3.12 en un entorno virtual con
+las dependencias de \campo{requirements.txt}, y con MongoDB~8 en Docker. El puerto
+por defecto (27017) estaba ocupado por otro contenedor, así que la base del
+proyecto se levantó en el puerto 27018, configurado en \campo{.env}. El MGN~2025
+se descargó del servicio de datos del geoportal del DANE. El informe se compiló con
+Tectonic~0.17.
+
 \subsection{Diferencias entre pipelines}
 
 Algunas diferencias entre las dos fuentes afectan la interpretación de las cifras:
@@ -922,11 +968,34 @@ Algunas diferencias entre las dos fuentes afectan la interpretación de las cifr
 \section{Conclusiones y próximos pasos}
 \label{sec:conclusiones}
 
-\pendiente{Redactar al final, con las cifras definitivas. Puntos a cubrir:
-las dos fuentes quedan cargadas y reproducibles con \campo{make edificios};
-el hallazgo de la validación esférica de MongoDB
-(sección~\ref{sec:samuel3-s2}); y el paso a la semana 4: asignar cada edificio
-a su municipio con \campo{\$geoWithin} sobre \campo{centroide}, agregar en
-\campo{resultados} y producir las tablas y mapas finales.}
+Al cierre de la semana~3 quedan cargadas dos colecciones de huellas de edificios
+en MongoDB: \campo{edificios\_google} con 2\,694\,786 documentos y
+\campo{edificios\_microsoft} con 1\,761\,048, ambas dentro de los 170 municipios
+PDET. Las dos pasan la validación de \campo{\$jsonSchema}, tienen el índice
+\campo{2dsphere} sobre \campo{centroide} y \campo{geometry}, y el índice único
+\campo{geom\_hash} sin duplicados. Todo el flujo se corre con un solo comando,
+\campo{make edificios}, y la corrida desde cero (sin datos descargados) dio las
+mismas cifras que la primera ejecución.
+
+Del EDA se desprenden tres conclusiones para el análisis posterior. Primero, las
+dos fuentes cubren casi la misma superficie (222 y 221\,km$^2$), pero Google la
+reparte en huellas más pequeñas: su área mediana es de 58\,m$^2$ frente a
+77\,m$^2$ de Microsoft. Segundo, la cobertura no es homogénea: cinco municipios
+no tienen edificios en Google, y varios tienen muy pocos, sobre todo en el
+Chocó. Tercero, la confianza de Google (0,65 a 0,98) permite un análisis de
+sensibilidad en la semana~4, que Microsoft no permite porque no trae ese dato.
+
+Dos hallazgos del proceso afectan la semana~4. El primero es la validación
+esférica de MongoDB que obligó a reparar geometrías
+(sección~\ref{sec:samuel3-s2}). El segundo es que el Parquet de Microsoft no traía
+metadatos GeoParquet; se corrigió y se regeneró, así que ambas fuentes se leen
+igual.
+
+Para la semana~4 el paso siguiente es asignar cada edificio a un único
+municipio con \campo{\$geoWithin} sobre \campo{centroide}, agregar el número de
+edificios y el área total por municipio en \campo{resultados}, y producir las
+tablas y mapas finales. Antes de esa asignación conviene revisar los cinco
+municipios sin edificios en Google y decidir si se reportan aparte, porque ahí el
+resultado depende más de la fuente que del municipio.
 
 \end{document}

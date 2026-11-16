@@ -21,7 +21,7 @@ modelo de datos.
 |---|---|---|
 | 1 | Infraestructura (Docker, esquema `$jsonSchema`) | Hecha |
 | 2 | Límites PDET: 170 municipios cargados e indexados | Hecha (Entrega 2) |
-| 3 | Huellas de edificios (Google y Microsoft) | Pendiente |
+| 3 | Huellas de edificios (Google y Microsoft): 2.694.786 y 1.761.048 edificios cargados e indexados, EDA en `notebooks/eda_edificios.ipynb` | Hecha (pendiente: GeoParquet del Parquet de Microsoft) |
 | 4 | Asignación por centroide, resultados e informe | Pendiente |
 
 ## Cómo correr el proyecto
@@ -36,6 +36,7 @@ pip install -r requirements.txt
 make up                         # levanta MongoDB 8 en Docker
 make schema                     # crea las colecciones con $jsonSchema (semana 1)
 make municipios                 # descarga, valida y carga los municipios PDET (semana 2)
+make edificios                  # descarga, limpia, carga e indexa edificios de Google y Microsoft (semana 3)
 ```
 
 El MGN 2025 no tiene enlace directo y estable: descarga `MGN2025_MPIO_GRAFICO.zip`

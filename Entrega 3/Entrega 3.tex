@@ -498,6 +498,24 @@ confianza (como se esperaba).
   \label{fig:ms-parquet}
 \end{figure}
 
+El Parquet se escribe además con los metadatos GeoParquet 1.0 (clave
+\campo{geo}: columna de geometría \campo{geometry}, codificación WKB, tipo
+\campo{Polygon}, CRS por defecto OGC:CRS84, es decir lon/lat), los mismos que
+trae el de Google. Una primera versión no los incluía y GeoPandas no podía leer
+el archivo directamente; la revisión cruzada lo detectó y se corrigió en
+\campo{limpieza\_microsoft.py}. Con los metadatos, \campo{gpd.read\_parquet}
+devuelve un \campo{GeoDataFrame} con las 1\,761\,048 geometrías válidas, y las
+dos fuentes se leen igual.
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{img/cap_ms_geoparquet.png}%
+    {\includegraphics[width=\textwidth,height=0.25\textheight,keepaspectratio]{img/cap_ms_geoparquet.png}}%
+    {\pendiente{captura \texttt{cap\_ms\_geoparquet.png}}}
+  \caption{Lectura del Parquet de Microsoft y del de Google con GeoPandas.}
+  \label{fig:ms-geoparquet}
+\end{figure}
+
 \subsection{Registro en MongoDB}
 \label{sec:ms-registro}
 

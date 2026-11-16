@@ -34,6 +34,11 @@ SCHEMA = pa.schema([
     ("geom_hash", pa.string()),
 ])
 
+# Metadatos GeoParquet 1.0 (clave "geo"): permiten que GeoPandas/DuckDB lean `geometry`
+# como capa. Sin "crs" se asume OGC:CRS84 (lon/lat), que es EPSG:4326 con orden x=lon.
+GEO_METADATA = {"version": "1.0.0", "primary_column": "geometry", "columns": {
+    "geometry": {"encoding": "WKB", "geometry_types": ["Polygon"]}}}
+
 ESTADISTICAS = ["leidos", "sin_geometria", "fuera_pdet", "dentro_pdet",
                 "invalidos", "descartados", "conservados"]
 

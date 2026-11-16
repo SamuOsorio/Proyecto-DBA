@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import json
 import shutil
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -28,7 +29,7 @@ import pandas as pd
 import shapely
 
 from src.common.config import ROOT, load_config, mongo_uri
-from src.edificios.comun import (ESTADISTICAS, cargar_union_pdet,
+from src.edificios.comun import (ESTADISTICAS, GEO_METADATA, cargar_union_pdet,
                                  escribir_parquet, limpiar_bloque)
 
 _UNION = None
@@ -60,9 +61,11 @@ def _unir_partes(carpeta_partes: Path, salida: Path) -> int:
     salida.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect()
     patron = str(carpeta_partes / "*.parquet")
+    # KV_METADATA con "geo": deja el Parquet como GeoParquet (igual que el de Google)
+    geo = json.dumps(GEO_METADATA).replace("'", "''")
     con.execute(f"""
         COPY (SELECT DISTINCT ON (geom_hash) * FROM read_parquet('{patron}'))
-        TO '{salida}' (FORMAT parquet, COMPRESSION zstd)""")
+        TO '{salida}' (FORMAT parquet, COMPRESSION zstd, KV_METADATA {{geo: '{geo}'}})""")
     return con.execute(f"SELECT count(*) FROM read_parquet('{salida}')").fetchone()[0]
 
 

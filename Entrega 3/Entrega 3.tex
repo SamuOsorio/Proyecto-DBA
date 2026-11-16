@@ -179,15 +179,210 @@ semana 4.
 % =====================================================================
 % 4. Google (Jorge)
 % =====================================================================
+% Captura de pantalla opcional: si el archivo img/<nombre>.png no existe,
+% el documento compila igual y muestra un [Pendiente] en su lugar.
+\newcommand{\capgoogle}[3]{%
+  \IfFileExists{img/#1.png}%
+    {\includegraphics[width=\textwidth,height=#3\textheight,keepaspectratio]{img/#1.png}}%
+    {\pendiente{captura \texttt{#2}}}}
+
 \section{Google Open Buildings: descarga y limpieza}
 \label{sec:google}
 
-\pendiente{Jorge. Material disponible: \campo{descarga\_google.py},
-\campo{limpieza\_google.py}, \campo{control\_google.tex}. Cifras ya verificadas
-en dos máquinas: 8 celdas S2 con \texttt{--solo-pdet} (3,11\,GB, SHA-256
-\texttt{19e8f1e7\ldots}), 31\,370\,317 en el rectángulo de Colombia,
-16\,512\,141 dentro de Colombia, 2\,694\,786 tras el prefiltro PDET, 0
-inválidos, 0 descartados, 0 duplicados. Confianza 0,65--0,9834.}
+Esta sección cubre \campo{descarga\_google.py} y \campo{limpieza\_google.py},
+que también genera la tabla de control. Google Open Buildings v3 se derivó de
+imágenes satelitales (inferencia de mayo de 2023) y se publica con licencia
+CC BY 4.0 y ODbL 1.0, a elección de quien la use. Cada edificio trae su
+polígono en WKT (\campo{geometry}), el centroide (\campo{latitude},
+\campo{longitude}), el área que calcula Google (\campo{area\_in\_meters}), la
+confianza del modelo (\campo{confidence}, entre 0,65 y 1,0) y un Plus Code. Los
+datos están repartidos en CSV comprimidos, uno por cada celda S2 de nivel~4.
+
+\subsection{Descarga}
+\label{sec:g-descarga}
+
+Para elegir las celdas se usa la tabla de umbrales que publica Google
+(\ruta{score_thresholds_s2_level_4.csv}), con una fila por celda: su
+\campo{s2\_token}, el polígono de la celda en WKT y el número de edificios.
+\campo{descarga\_google.py} la baja, la cruza con el MGN y se queda con las
+celdas que intersectan el territorio y tienen al menos un edificio. Para
+Colombia completa son 10 celdas (3,15\,GB comprimidos). Con la opción
+\texttt{--solo-pdet}, que es la que usa \campo{make edificios}, el cruce se hace
+contra la unión de los 170 municipios PDET y quedan 8 celdas (3,11\,GB): salen
+\campo{8df} y \campo{8f1}, que no aportan ningún edificio PDET.
+
+Cada celda se baja en \emph{streaming} a un archivo \campo{.part}, que se
+reanuda si se corta la conexión; al terminar se verifica que su tamaño
+coincida con el que informa el servidor, y los archivos que ya están completos
+no se vuelven a bajar. De cada archivo se calcula el SHA-256 y todo queda en
+\ruta{descarga_google.json}. El SHA-256 de la fuente es el hash de la lista
+ordenada de pares \campo{token:sha256}, y es el que se guarda en
+\campo{fuentes}. Dos corridas en máquinas distintas dieron el mismo valor (el
+SHA-256 de la fuente empieza por \texttt{19e8f1e7}).
+
+\begin{figure}[H]
+  \centering
+  \capgoogle{cap_google_listar}{descarga\_google --listar}{0.25}
+  \caption{Celdas S2 que tocan Colombia y su tamaño, sin descargar nada
+  (\texttt{--listar}).}
+  \label{fig:g-listar}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \capgoogle{cap_google_descarga}{descarga\_google}{0.25}
+  \caption{Descarga de las celdas S2 y SHA-256 de la fuente.}
+  \label{fig:g-descarga}
+\end{figure}
+
+\subsection{Prefiltro con DuckDB}
+\label{sec:g-prefiltro}
+
+Las 8 celdas tienen más de 31 millones de filas dentro del rectángulo de
+Colombia, así que \campo{limpieza\_google.py} no las carga completas: DuckDB
+lee cada CSV comprimido directamente y entrega los datos en tandas de unas
+100\,000 filas. El filtro tiene dos etapas:
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Rectángulo.} En la consulta SQL se descarta todo lo que cae
+        fuera del rectángulo que envuelve a Colombia y se marca cada fila que
+        cae dentro del rectángulo de algún municipio PDET. Solo las filas
+        marcadas conservan el WKT; en las demás la geometría queda vacía y no
+        se mueve.
+  \item \textbf{Centroide dentro del polígono.} Con las columnas
+        \campo{latitude} y \campo{longitude} de Google (el centroide del
+        edificio) se prueba si el punto cae dentro de algún polígono PDET,
+        con un índice espacial de Shapely. Un punto sobre el borde de dos
+        municipios se asigna al primero. Es la misma regla del centroide que
+        usará la semana~4.
+\end{enumerate}
+
+En el mismo recorrido se cuenta cuántas filas del rectángulo caen dentro de
+Colombia (contra el polígono del MGN simplificado a unos 100\,m, suficiente
+para contar). Resultado: de 31\,370\,317 filas en el rectángulo, 16\,512\,141
+están dentro de Colombia y 2\,694\,786 dentro de los municipios PDET, es decir,
+el 16,3\,\% de las de Colombia. Los sobrevivientes se guardan en partes de unas
+500\,000 filas, que lee el paso de limpieza.
+
+\begin{figure}[H]
+  \centering
+  \capgoogle{cap_google_prefiltro}{limpieza\_google prefiltro}{0.3}
+  \caption{Prefiltro: acumulados \emph{en Colombia} y \emph{tras el prefiltro}
+  por cada celda.}
+  \label{fig:g-prefiltro}
+\end{figure}
+
+\subsection{Limpieza y Parquet}
+\label{sec:g-limpieza}
+
+Cada parte pasa por la limpieza y se escribe en un Parquet intermedio:
+\begin{enumerate}[leftmargin=*]
+  \item Se construyen las geometrías con Shapely a partir del WKT y se
+        descartan las ilegibles.
+  \item \textbf{Validación y reparación}: los polígonos inválidos se reparan
+        con \campo{make\_valid}. El contrato pide \campo{Polygon}, así que si el
+        resultado es un multipolígono o una colección se conserva el polígono
+        de mayor área.
+  \item \textbf{Área y centroide}: se proyecta a EPSG:9377 y se calcula
+        \campo{area\_m2} y el centroide, que vuelve a EPSG:4326; la geometría
+        se guarda en EPSG:4326. El área de Google se conserva aparte en
+        \campo{area\_m2\_fuente}.
+  \item \textbf{\campo{geom\_hash}}: MD5 de la geometría normalizada y
+        redondeada a $10^{-7}$ grados (cerca de 1\,cm), para que dos
+        copias del mismo edificio den el mismo valor.
+  \item \textbf{Duplicados}: se descarta todo edificio cuyo
+        \campo{geom\_hash} ya apareció, dentro de la parte o en las
+        anteriores, porque un edificio puede venir en dos celdas.
+  \item DuckDB une las partes y escribe un único Parquet comprimido (zstd).
+\end{enumerate}
+
+\begin{table}[H]
+\centering\small
+\caption{Contrato de columnas de \campo{edificios\_google.parquet}.}
+\label{tab:g-contrato}
+\begin{tabularx}{\textwidth}{@{}p{3.6cm}p{2.4cm}L@{}}
+\toprule
+\textbf{Columna} & \textbf{Tipo} & \textbf{Contenido} \\
+\midrule
+\campo{fuente\_id} & texto & \campo{google} \\
+\campo{geometry} & WKB & \campo{Polygon} en EPSG:4326 \\
+\campo{centroide\_lon}, \campo{centroide\_lat} & \campo{double} & Centroide de la huella, en EPSG:4326 \\
+\campo{area\_m2} & \campo{double} & Área en EPSG:9377, en m$^2$ \\
+\campo{area\_m2\_fuente} & \campo{double} & \campo{area\_in\_meters} de Google \\
+\campo{confianza} & \campo{double} & \campo{confidence} de Google (0,65 a 1,0) \\
+\campo{cod\_mpio} & texto & Vacía (\campo{null}) hasta la semana 4 \\
+\campo{geom\_hash} & texto & MD5 de la geometría normalizada \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+La tabla~\ref{tab:g-control} reúne los controles. La primera columna es la
+corrida de \campo{make edificios} (8 celdas, \texttt{--solo-pdet}), verificada
+en dos máquinas; la segunda es una corrida con las 10 celdas que tocan
+Colombia, hecha para comprobar que el resultado PDET no depende de la selección
+de celdas. En esta última los tiempos fueron 2,9\,min de descarga, 6,6\,min de
+prefiltro y 1,9\,min de limpieza y exportación.
+
+\begin{table}[H]
+\centering\small
+\caption{Control de calidad de Google.}
+\label{tab:g-control}
+\begin{tabularx}{\textwidth}{@{}Lrr@{}}
+\toprule
+\textbf{Concepto} & \textbf{8 celdas (\texttt{--solo-pdet})} & \textbf{10 celdas (Colombia)} \\
+\midrule
+Archivos descargados (celdas S2) & 8 & 10 \\
+Tamaño descargado (GB, comprimido) & 3,11 & 3,15 \\
+Registros en el rectángulo de Colombia & 31\,370\,317 & 31\,404\,404 \\
+Registros dentro de Colombia & 16\,512\,141 & 16\,541\,410 \\
+Registros tras el prefiltro PDET & 2\,694\,786 & 2\,694\,786 \\
+\quad Geometrías inválidas reparadas & 0 & 0 \\
+\quad Descartados por geometría & 0 & 0 \\
+\quad Duplicados por \campo{geom\_hash} & 0 & 0 \\
+Edificios en el Parquet & 2\,694\,786 & 2\,694\,786 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Los 2\,694\,786 edificios son los mismos en las dos corridas, como debe ser: las
+dos celdas que se omiten con \texttt{--solo-pdet} no tienen edificios PDET. La
+confianza observada va de 0,65 a 0,9834. Google ya entrega solo detecciones con
+confianza de al menos 0,65, así que en esta fase no se filtra por confianza; el
+umbral queda como parámetro de la semana~4
+(\ruta{edificios.umbral_confianza_google_default} en \campo{config.yaml}).
+
+\subsection{Registro en MongoDB}
+\label{sec:g-registro}
+
+La fuente queda en \campo{fuentes} (\campo{\_id=google}) con nombre, versión
+(v3), licencia, URL de descarga, periodo de las imágenes, CRS de origen, fecha
+de descarga, SHA-256 de la fuente, la lista de archivos con su SHA-256 y el
+tamaño total. Tras la carga se completa \campo{n\_registros}
+(sección~\ref{sec:samuel3-carga}, tabla~\ref{tab:carga-edif}).
+
+\begin{figure}[H]
+  \centering
+  \capgoogle{cap_google_fuentes}{documento de Google en fuentes}{0.3}
+  \caption{Documento de Google en \campo{fuentes}.}
+  \label{fig:g-fuentes}
+\end{figure}
+
+\subsection{Alcance de la verificación}
+\label{sec:g-limites}
+
+Lo que se comprobó: el pipeline es reproducible (dos máquinas, mismo SHA-256 y
+mismas cifras) y la selección de celdas no cambia el resultado PDET
+(tabla~\ref{tab:g-control}). Como Google no produjo ningún caso real de
+geometría inválida, de WKT ilegible ni de duplicado, esa parte de la limpieza
+no se ejercitó con datos reales.
+
+Lo que \textbf{no} se hizo: un cruce espacial independiente con GeoPandas
+sobre una muestra de municipios, pruebas automáticas, ni una comparación
+sistemática de \campo{area\_m2} contra \campo{area\_m2\_fuente}. Dos
+limitaciones a tener presentes: el conteo \emph{dentro de Colombia} usa un
+polígono simplificado, así que es aproximado en los bordes; y el prefiltro usa
+el centroide que trae Google, mientras que el \campo{centroide} que se guarda se
+recalcula en EPSG:9377, por lo que un edificio justo en el límite de un
+municipio podría quedar en lados distintos según el cálculo (no se cuantificó).
 
 % =====================================================================
 % 5. Microsoft (Maria Camila)

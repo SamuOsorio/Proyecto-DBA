@@ -1,0 +1,465 @@
+% =====================================================================
+% DBA - Proyecto final - Entrega 3
+% Huellas de edificios: descarga, limpieza, carga en MongoDB y EDA
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+% =====================================================================
+% Preámbulo compartido - DBA Proyecto final
+% =====================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}{}
+\usepackage[spanish,es-noshorthands,es-tabla]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,array}
+\usepackage{enumitem}
+\usepackage[dvipsnames,table]{xcolor}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{calc,positioning}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+
+% --- Colores --------------------------------------------------------
+\definecolor{acento}{HTML}{2F6FDB}
+\definecolor{gris}{HTML}{6B6B6B}
+\hypersetup{colorlinks=true, linkcolor=acento, urlcolor=acento, citecolor=acento}
+
+% --- Tablas ---------------------------------------------------------
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.25}
+
+% --- Listas ---------------------------------------------------------
+\setlist{itemsep=2pt, topsep=4pt}
+
+% --- Código (JSON / mongosh) ----------------------------------------
+\lstdefinestyle{codigo}{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{gray!50},
+  backgroundcolor=\color{gray!6},
+  xleftmargin=4pt, xrightmargin=4pt,
+  showstringspaces=false,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+           {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+           {ñ}{{\~n}}1 {Ñ}{{\~N}}1
+}
+\lstset{style=codigo}
+
+% --- Atajos ---------------------------------------------------------
+\newcommand{\campo}[1]{\texttt{#1}}
+\newcommand{\pendiente}[1]{\textcolor{gris}{\textit{[Pendiente -- #1]}}}
+% Ruta de archivo larga: igual que \campo pero se puede partir en / y _
+% (xurl ya amplía los puntos de corte de \url para que esto funcione).
+\newcommand{\ruta}[1]{\begingroup\urlstyle{tt}\url{#1}\endgroup}
+
+\begin{document}
+
+% ------------------------------- Portada -----------------------------
+\begin{titlepage}
+  \centering
+  {\large Pontificia Universidad Javeriana\par}
+  {\large Departamento de Ingeniería de Sistemas\par}
+  \vspace{0.8cm}
+  {\large Administración de Bases de Datos (DBA) -- 2026-30\par}
+  \vspace{2.5cm}
+  {\Huge\bfseries Proyecto final\par}
+  \vspace{1cm}
+  {\LARGE Entrega 3: Huellas de edificios -- descarga,\\ carga en MongoDB y EDA\par}
+  \vspace{1cm}
+  {\large Potencial solar en techos de los municipios PDET\par}
+  \vspace{3cm}
+  {\large
+    Maria Camila Beltran \\
+    \vspace{0.5cm}
+    Jorge Fortich \\
+    \vspace{0.5cm}
+    Jose Eduardo Valeriano \\
+    \vspace{0.5cm}
+    Samuel Osorio Rodríguez\par}
+  \vspace{3cm}
+  {\large Profesor: Andrés Oswaldo Calderón Romero, Ph.D.\par}
+  \vspace{3cm}
+  {\large {Noviembre 16 de 2026}\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+% 1. Contexto
+% =====================================================================
+\section{Contexto}
+\label{sec:contexto}
+
+Esta entrega corresponde a la \textbf{semana 3} del plan de implementación
+definido en la Entrega 1: descargar las huellas de edificios de Google Open
+Buildings v3 y Microsoft Building Footprints, quedarse con las que caen en los
+170 municipios PDET, limpiarlas y cargarlas en MongoDB con índices espaciales.
+La asignación de cada edificio a su municipio y el cálculo de área por
+municipio son de la semana 4.
+
+El flujo de cada fuente es el mismo y lo encadena \campo{src/edificios/run.py}
+(lo que corre \campo{make edificios}): descarga con \campo{SHA-256}, prefiltro
+a PDET por la regla del centroide, limpieza compartida
+(\campo{src/edificios/comun.py}) hacia un Parquet con el mismo contrato de
+columnas, y finalmente creación de colecciones, carga e índices en MongoDB.
+
+\begin{table}[H]
+  \centering
+  \caption{Cifras principales de la entrega.}
+  \label{tab:resumen}
+  \begin{tabularx}{\textwidth}{L r r}
+    \toprule
+    & Google & Microsoft \\
+    \midrule
+    Archivos descargados & 8 celdas S2 (3,11\,GB) & 125 cuadros quadkey (373,4\,MB) \\
+    Edificios leídos del área descargada & 16\,512\,141 (dentro de Colombia) & 4\,595\,615 \\
+    Edificios en PDET (en la colección) & 2\,694\,786 & 1\,761\,048 \\
+    Polígonos inválidos reparados (GEOS) & 0 & 28 \\
+    Duplicados por \campo{geom\_hash} & 0 & 0 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% =====================================================================
+% 2. Plan de implementación
+% =====================================================================
+\section{Plan de implementación}
+\label{sec:plan}
+
+\begin{table}[H]
+  \centering
+  \caption{Plan de implementación y estado.}
+  \label{tab:plan}
+  \begin{tabularx}{\textwidth}{l L L l}
+    \toprule
+    Semana & Fase & Resultado principal & Estado \\
+    \midrule
+    1 & Infraestructura & MongoDB 8 en Docker, repositorio y configuración & Hecha \\
+    2 & Límites PDET & 170 municipios cargados, validados e indexados & Hecha \\
+    3 & Huellas de edificios & Google y Microsoft descargados, limpios, cargados e
+        indexados; EDA breve & \textbf{Esta entrega} \\
+    4 & Análisis e informe & Asignación por centroide, agregación en
+        \campo{resultados}, mapas y ranking & Pendiente \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\textbf{Organización del equipo.} Una rama por persona y por
+tarea, con revisión cruzada antes del merge a \campo{main}. Reparto de esta
+semana: descarga y limpieza de Google (Jorge); descarga y limpieza de
+Microsoft (Maria Camila); esquema, carga, índices y \campo{make edificios}
+(Samuel); EDA (Jose Eduardo).
+
+% =====================================================================
+% 3. Modelo de datos
+% =====================================================================
+\section{Modelo de datos}
+\label{sec:modelo}
+
+Las colecciones \campo{edificios\_google} y \campo{edificios\_microsoft}
+comparten esquema (Entrega 1, sección 5). Entre las dos entregas se hizo un
+ajuste: el Parquet intermedio no lleva \campo{cod\_mpio} ni \campo{lote\_id};
+el segundo lo pone la carga y el primero queda en \campo{null} hasta la
+semana 4.
+
+\pendiente{Tabla del diccionario de \campo{edificios\_*} y diagrama E-R
+(se puede reutilizar \ruta{../Entrega 2/img/diagrama_er.png}); Samuel, sección
+\ref{sec:samuel3-schema}, ya describe el validador.}
+
+% =====================================================================
+% 4. Google (Jorge)
+% =====================================================================
+\section{Google Open Buildings: descarga y limpieza}
+\label{sec:google}
+
+\pendiente{Jorge. Material disponible: \campo{descarga\_google.py},
+\campo{limpieza\_google.py}, \campo{control\_google.tex}. Cifras ya verificadas
+en dos máquinas: 8 celdas S2 con \texttt{--solo-pdet} (3,11\,GB, SHA-256
+\texttt{19e8f1e7\ldots}), 31\,370\,317 en el rectángulo de Colombia,
+16\,512\,141 dentro de Colombia, 2\,694\,786 tras el prefiltro PDET, 0
+inválidos, 0 descartados, 0 duplicados. Confianza 0,65--0,9834.}
+
+% =====================================================================
+% 5. Microsoft (Maria Camila)
+% =====================================================================
+\section{Microsoft Building Footprints: descarga y limpieza}
+\label{sec:microsoft}
+
+\pendiente{Maria Camila. Material disponible: \campo{descarga\_microsoft.py},
+\campo{limpieza\_microsoft.py}, \campo{control\_microsoft.csv}. Cifras
+verificadas: 232 cuadros de Colombia en el índice, 125 tocan PDET (373,4\,MB,
+SHA-256 global \texttt{3ca8b1d5\ldots}), 4\,595\,615 leídos, 2\,834\,567 fuera de
+PDET, 1\,761\,048 dentro, 28 inválidos reparados, 0 duplicados.}
+
+% =====================================================================
+% 6. Esquema, carga e índices (Samuel)
+% =====================================================================
+\newcommand{\figsamuel}[2]{%
+  \IfFileExists{img/#1.png}%
+    {\includegraphics[width=\textwidth]{img/#1.png}}%
+    {\pendiente{captura \texttt{#2}}}}
+
+\section{Esquema, carga e índices de edificios en MongoDB}
+\label{sec:samuel3}
+
+Esta sección cubre \campo{schema.py}, \campo{carga.py}, \campo{indices.py},
+\campo{evidencia.py} y \campo{run.py}, todos en \campo{src/edificios/}. Toman
+los dos Parquet limpios (uno por fuente, con el mismo contrato de columnas) y
+los dejan en MongoDB listos para la asignación por centroide de la semana~4.
+
+\subsection{Colecciones con validación \texorpdfstring{\campo{\$jsonSchema}}{\$jsonSchema}}
+\label{sec:samuel3-schema}
+
+\campo{schema.py} crea \campo{edificios\_google} y \campo{edificios\_microsoft}
+con el mismo validador, derivado del diccionario de datos de la Entrega~1
+(sección~5). Campos requeridos: \campo{fuente\_id}, \campo{geometry}
+(\campo{Polygon}), \campo{centroide} (\campo{Point} de dos \campo{double}),
+\campo{area\_m2} ($\geq 0$), \campo{geom\_hash} y \campo{lote\_id}.
+\campo{confianza} (entre 0 y 1), \campo{area\_m2\_fuente} y \campo{cod\_mpio}
+aceptan \campo{null}: Microsoft no entrega confianza ni área propia, y
+\campo{cod\_mpio} se llena en la semana~4. La validación es estricta
+(\campo{validationLevel="strict"}), así que MongoDB rechaza al insertar
+cualquier documento que no cumpla. Igual que en la Entrega~2, si la colección
+ya existe el script no modifica su validador.
+
+\begin{figure}[H]
+  \centering
+  \figsamuel{cap_schema_edificios}{schema.py}
+  \caption{Ejecución de \campo{schema.py}: se crean las dos colecciones de
+  edificios con validación \campo{\$jsonSchema}.}
+  \label{fig:cap-schema-edif}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \figsamuel{cap_validacion_edificios}{validación}
+  \caption{Un documento de edificio sin campos obligatorios es rechazado por
+  el validador (código de error 121).}
+  \label{fig:cap-validacion-edif}
+\end{figure}
+
+\subsection{Carga por lotes e idempotente}
+\label{sec:samuel3-carga}
+
+\campo{carga.py} lee el Parquet con \campo{pyarrow} en lotes de 5\,000 filas
+(\campo{edificios.tamano\_lote\_insercion} en \campo{config.yaml}), de modo que
+nunca se sube el archivo completo a memoria. Cada lote se convierte en
+documentos: la geometría pasa de WKB a GeoJSON con Shapely, el centroide se
+arma como \campo{Point} y \campo{cod\_mpio} queda en \campo{null}. La
+inserción usa \campo{insert\_many(ordered=False)}, así un documento rechazado
+no frena el resto del lote.
+
+Decisiones de diseño:
+\begin{itemize}
+  \item \textbf{Idempotencia.} Antes de cargar, borra los documentos previos
+        de la misma fuente; correr la carga dos veces deja el mismo conteo
+        (comprobado: segunda corrida con \campo{make edificios}, mismas
+        cifras).
+  \item \textbf{\campo{lote\_id}.} Cada ejecución genera un \campo{ObjectId}
+        que se guarda en cada edificio y es el \campo{\_id} de su fila en
+        \campo{bitacora\_cargas}, con inicio, fin, registros correctos,
+        rechazados y velocidad. Así cada edificio se rastrea hasta la carga
+        que lo trajo.
+  \item \textbf{Índices.} Se borran los índices (salvo \campo{\_id}) antes de
+        cargar y los de \campo{centroide}, \campo{cod\_mpio} y
+        \campo{geom\_hash} se crean después, porque mantenerlos durante la
+        inserción es más lento. El de \campo{geometry} es la excepción, por
+        la razón de la sección~\ref{sec:samuel3-s2}.
+  \item Se actualiza \campo{fuentes.n\_registros} con el total cargado.
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lrrrrL@{}}
+\toprule
+\textbf{Fuente} & \textbf{Documentos} & \textbf{Rechazados} &
+\textbf{Reparados (S2)} & \textbf{Tiempo (s)} & \textbf{Velocidad} \\
+\midrule
+Google    & 2\,694\,786 & 0 & 0  & 63,5 & 42\,468 docs/s \\
+Microsoft & 1\,761\,048 & 0 & 29 & 43,4 & 40\,608 docs/s \\
+\bottomrule
+\end{tabularx}
+\caption{Carga a MongoDB (corrida completa de \campo{make edificios}, MongoDB
+8 en Docker local, un solo equipo). Los tiempos dependen de la máquina.}
+\label{tab:carga-edif}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \figsamuel{cap_carga_edificios}{carga.py}
+  \caption{Ejecución de \campo{carga.py} para las dos fuentes.}
+  \label{fig:cap-carga-edif}
+\end{figure}
+
+\subsection{Un hallazgo: polígonos válidos para GEOS que MongoDB rechaza}
+\label{sec:samuel3-s2}
+
+La primera versión creaba todos los índices después de la carga. El índice
+\campo{2dsphere} sobre \campo{geometry} de Microsoft falló: MongoDB construye
+sus claves con geometría esférica (biblioteca S2) y encontró un polígono cuyas
+aristas se cruzan (\emph{``Loop is not valid\ldots Edges 1 and 3 cross''}),
+aunque la limpieza ya lo había dado por válido con GEOS, que trabaja en el
+plano. Con una sola geometría así, la construcción de todo el índice aborta.
+
+Se midió con una muestra de 300\,000 edificios: 5 rechazados, es decir unos
+2 por millón. La solución fue crear el índice de \campo{geometry} \emph{antes}
+de cargar: con el índice activo MongoDB rechaza solo los documentos afectados
+y la carga sigue (en la muestra costó 5,5 s). Cada rechazado se repara
+redondeando las coordenadas a $10^{-6}$ grados (unos 11\,cm) con
+\campo{shapely.set\_precision} y se reintenta; como respaldo existe el casco
+convexo. En una prueba con los 5 casos de la muestra, el redondeo los resolvió
+todos, mientras que \campo{buffer(0)} y \campo{simplify} no resolvieron
+ninguno. En la carga completa, Microsoft tuvo 29 reparados y Google ninguno,
+y no se descartó ningún edificio. Los reparados conservan el
+\campo{geom\_hash} del polígono original, y el conteo de reparados queda en
+\campo{bitacora\_cargas.parametros.reparados\_s2}.
+
+\subsection{Índices}
+\label{sec:samuel3-indices}
+
+\campo{indices.py} crea los índices del diccionario de datos (Entrega~1,
+sección~5.5) en las dos colecciones y mide cuánto tarda cada uno:
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}p{3.6cm}Lrr@{}}
+\toprule
+\textbf{Índice} & \textbf{Para qué} & \textbf{Google (s)} & \textbf{Microsoft (s)} \\
+\midrule
+\campo{2dsphere} en \campo{centroide} & \campo{\$geoWithin} de la asignación (semana~4) & 7,0 & 4,4 \\
+\campo{2dsphere} en \campo{geometry} & \campo{\$geoIntersects} en límites & \multicolumn{2}{c}{creado antes de cargar} \\
+\campo{cod\_mpio} & agregación por municipio & 4,7 & 1,4 \\
+\campo{geom\_hash} (único) & evitar duplicados & 3,5 & 2,3 \\
+\bottomrule
+\end{tabularx}
+\caption{Tiempo de creación de cada índice.}
+\label{tab:indices-edif}
+\end{table}
+
+El índice único sobre \campo{geom\_hash} es una segunda barrera contra
+duplicados, además del \campo{DISTINCT ON (geom\_hash)} de la limpieza: si
+algún duplicado llegara a la colección, la creación del índice fallaría.
+
+\begin{figure}[H]
+  \centering
+  \figsamuel{cap_indices_edificios}{indices.py}
+  \caption{Ejecución de \campo{indices.py}.}
+  \label{fig:cap-indices-edif}
+\end{figure}
+
+\subsection{Evidencia de que los índices se usan}
+\label{sec:samuel3-evidencia}
+
+\campo{evidencia.py} usa como ventana el polígono de un municipio PDET
+(Caldono, 19137) y corre dos consultas por fuente. Con \campo{.explain()}
+exige que el plan use \campo{IXSCAN} y no \campo{COLLSCAN}, y para
+contrastar repite la consulta de la semana~4 forzando el recorrido completo
+con \campo{hint(\{\$natural: 1\})}.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}llLrr@{}}
+\toprule
+\textbf{Fuente} & \textbf{Plan} & \textbf{Consulta} & \textbf{Resultados} & \textbf{Tiempo (s)} \\
+\midrule
+Google    & IXSCAN   & \campo{\$geoWithin} sobre \campo{centroide}   & 15\,303 & 0,44 \\
+Google    & IXSCAN   & \campo{\$geoIntersects} sobre \campo{geometry} & 15\,304 & 0,37 \\
+Google    & COLLSCAN & \campo{\$geoWithin} sin índice                 & 15\,303 & 2,97 \\
+Microsoft & IXSCAN   & \campo{\$geoWithin} sobre \campo{centroide}   & 12\,547 & 0,33 \\
+Microsoft & IXSCAN   & \campo{\$geoIntersects} sobre \campo{geometry} & 12\,548 & 0,29 \\
+Microsoft & COLLSCAN & \campo{\$geoWithin} sin índice                 & 12\,547 & 1,95 \\
+\bottomrule
+\end{tabularx}
+\caption{Planes de ejecución y tiempos en Caldono. Es una sola consulta por
+caso, así que los tiempos son indicativos, no un \emph{benchmark}.}
+\label{tab:evidencia-edif}
+\end{table}
+
+Con el índice, la consulta de asignación corre unas 6,7 veces más rápido en
+Google y unas 5,9 en Microsoft que sin él, con el mismo resultado. La
+diferencia de un edificio entre \campo{\$geoWithin} (centroide dentro) y
+\campo{\$geoIntersects} (huella que toca el municipio) corresponde a un
+edificio que cruza el límite: es la razón de usar el centroide como regla de
+asignación, para que cada edificio pertenezca a un solo municipio.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lrrrL@{}}
+\toprule
+\textbf{Colección} & \textbf{Documentos} & \textbf{Datos (MB)} & \textbf{Índices (MB)} & \textbf{Mayor índice} \\
+\midrule
+\campo{edificios\_google}    & 2\,694\,786 & 1\,279 & 251 & \campo{geom\_hash} (111 MB) \\
+\campo{edificios\_microsoft} & 1\,761\,048 & 835    & 194 & \campo{geom\_hash} (88 MB) \\
+\bottomrule
+\end{tabularx}
+\caption{Tamaño de las colecciones (\campo{collStats}).}
+\label{tab:tamano-edif}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \figsamuel{cap_evidencia_edificios}{evidencia.py}
+  \caption{Salida de \campo{evidencia.py}: planes con \campo{IXSCAN} y tamaños.}
+  \label{fig:cap-evidencia-edif}
+\end{figure}
+
+\subsection{Ejecución de punta a punta: \texorpdfstring{\campo{make edificios}}{make edificios}}
+\label{sec:samuel3-run}
+
+\campo{run.py} encadena, para cada fuente, descarga, limpieza, creación de
+colecciones, carga, índices y evidencia, con un solo comando. Cada paso es
+reanudable: la descarga reutiliza los archivos ya bajados y recalcula el
+SHA-256 de la fuente; la limpieza regenera el Parquet y la carga es idempotente. Se corrió
+\campo{make edificios} sobre datos ya descargados y se obtuvieron
+exactamente las mismas cifras que en la primera ejecución (2\,694\,786 y
+1\,761\,048 documentos, 29 reparados en Microsoft). Esto verifica el flujo y
+la idempotencia; \textbf{no} es una descarga desde cero, que se probó
+por separado.\footnote{\pendiente{confirmar tras borrar \texttt{data/raw/} y correr
+\texttt{make edificios}; ajustar o quitar esta nota.}}
+
+\begin{figure}[H]
+  \centering
+  \figsamuel{cap_run_edificios}{make edificios}
+  \caption{Final de la ejecución de \campo{make edificios}.}
+  \label{fig:cap-run-edif}
+\end{figure}
+
+
+% =====================================================================
+% 7. EDA (Jose Eduardo)
+% =====================================================================
+\section{Análisis exploratorio breve}
+\label{sec:eda}
+
+\pendiente{Jose Eduardo. Material de contraste ya calculado: Google tiene unas
+1,53 veces más edificios que Microsoft pero más pequeños (media 82,4 frente a
+125,6\,m$^2$; mediana 57,9 frente a 77,0), y el área total es parecida
+($\approx$222 frente a $\approx$221\,km$^2$, calcular la suma exacta).
+Diferencias menores entre pipelines a mencionar: Google trae una columna
+\campo{cod\_mpio} vacía; hash MD5 frente a SHA-1; orientación de anillos;
+cálculo del centroide.}
+
+% =====================================================================
+% 8. Conclusiones
+% =====================================================================
+\section{Conclusiones y próximos pasos}
+\label{sec:conclusiones}
+
+\pendiente{Redactar al final, con las cifras definitivas. Puntos a cubrir:
+las dos fuentes quedan cargadas y reproducibles con \campo{make edificios};
+el hallazgo de la validación esférica de MongoDB
+(sección~\ref{sec:samuel3-s2}); y el paso a la semana 4: asignar cada edificio
+a su municipio con \campo{\$geoWithin} sobre \campo{centroide}, agregar en
+\campo{resultados} y producir las tablas y mapas finales.}
+
+\end{document}

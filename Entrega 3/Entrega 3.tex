@@ -195,11 +195,148 @@ inválidos, 0 descartados, 0 duplicados. Confianza 0,65--0,9834.}
 \section{Microsoft Building Footprints: descarga y limpieza}
 \label{sec:microsoft}
 
-\pendiente{Maria Camila. Material disponible: \campo{descarga\_microsoft.py},
-\campo{limpieza\_microsoft.py}, \campo{control\_microsoft.csv}. Cifras
-verificadas: 232 cuadros de Colombia en el índice, 125 tocan PDET (373,4\,MB,
-SHA-256 global \texttt{3ca8b1d5\ldots}), 4\,595\,615 leídos, 2\,834\,567 fuera de
-PDET, 1\,761\,048 dentro, 28 inválidos reparados, 0 duplicados.}
+Esta sección cubre \campo{descarga\_microsoft.py} y
+\campo{limpieza\_microsoft.py}. Microsoft publica sus huellas globales
+(versión 2026-02-03, licencia ODbL 1.0) en particiones por cuadro
+\emph{quadkey} de nivel 9, como GeoJSON por líneas comprimido: un edificio por
+línea, solo con su polígono (los campos \campo{confidence} y \campo{height}
+vienen en $-1$). Por eso, a diferencia de Google, esta fuente no aporta
+confianza ni área propia.
+
+\subsection{Descarga}
+\label{sec:ms-descarga}
+
+El índice público \campo{dataset-links.csv} lista todas las particiones del
+mundo; las de Colombia se identifican porque la fila empieza por
+\campo{Colombia,} (la columna \campo{Location} es la primera). Hay 232
+(figura~\ref{fig:ms-indice}). Descargarlas todas sería innecesario, así que
+\campo{descarga\_microsoft.py} calcula el rectángulo de cada quadkey y se
+queda solo con los 125 que intersectan la unión de los 170 municipios PDET.
+Los baja en paralelo (8 hilos), sin repetir los que ya están, y deja un
+\campo{manifest.csv} con el SHA-256 de cada archivo y uno global, que se
+guarda también en \campo{fuentes}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.2\textheight,keepaspectratio]{img/cap_ms_indice.png}
+  \caption{Índice de Microsoft: cabecera y 232 particiones de Colombia.}
+  \label{fig:ms-indice}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.2\textheight,keepaspectratio]{img/cap_ms_descarga.png}
+  \caption{Descarga: 125 de 232 particiones tocan PDET (373,4\,MB en 55,8\,s en
+  esta corrida) y SHA-256 global de la fuente.}
+  \label{fig:ms-descarga}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.22\textheight,keepaspectratio]{img/cap_ms_manifest.png}
+  \caption{\campo{manifest.csv}: una fila por archivo con su tamaño y SHA-256
+  (126 líneas: 125 archivos y la cabecera). \campo{du} informa 364\,M porque usa
+  MiB y cuenta también el índice y el manifiesto.}
+  \label{fig:ms-manifest}
+\end{figure}
+
+\subsection{Limpieza y Parquet}
+\label{sec:ms-limpieza}
+
+\campo{limpieza\_microsoft.py} procesa cada archivo en un proceso aparte
+(8 en paralelo) sin cargarlo todo en memoria, con la misma función de limpieza
+que Google (\campo{comun.py}), para que los dos Parquet sigan el mismo
+contrato:
+\begin{enumerate}[leftmargin=*]
+  \item Construye las geometrías con Shapely y descarta las ilegibles.
+  \item \textbf{Prefiltro por centroide}: se conserva el edificio solo si su
+        centroide cae dentro de la unión de los municipios PDET. Es la misma
+        regla que usará la semana~4 para asignar municipios.
+  \item \textbf{Validación y reparación}: los polígonos inválidos
+        (autointersecciones) se reparan con \campo{make\_valid} y se conserva
+        la parte poligonal mayor.
+  \item \textbf{Área en metros}: se proyecta a EPSG:9377 y se calcula
+        \campo{area\_m2}; la geometría se guarda en EPSG:4326.
+  \item \textbf{\campo{geom\_hash}}: SHA-1 de la geometría normalizada.
+  \item Une las partes con DuckDB eliminando duplicados por
+        \campo{geom\_hash} y escribe un único Parquet comprimido (zstd).
+\end{enumerate}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.25\textheight,keepaspectratio]{img/cap_ms_limpieza.png}
+  \caption{Tabla de control de la limpieza de Microsoft.}
+  \label{fig:ms-limpieza}
+\end{figure}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}Lr@{}}
+\toprule
+\textbf{Concepto} & \textbf{Valor} \\
+\midrule
+Registros leídos (125 particiones) & 4\,595\,615 \\
+Geometrías ilegibles & 0 \\
+Fuera de los municipios PDET (centroide) & 2\,834\,567 \\
+Dentro de PDET & 1\,761\,048 \\
+\quad Inválidos reparados & 28 \\
+\quad Descartados & 0 \\
+Duplicados por \campo{geom\_hash} & 0 \\
+Edificios en el Parquet & 1\,761\,048 \\
+Tiempo de limpieza / unión & 7,9\,s / 0,4\,s \\
+Tamaño del Parquet & 200,1\,MB \\
+\bottomrule
+\end{tabularx}
+\caption{Control de calidad de Microsoft.}
+\label{tab:ms-control}
+\end{table}
+
+Se verificó el Parquet resultante: 1\,761\,048 filas y 1\,761\,048
+\campo{geom\_hash} distintos (sin duplicados), área media 125,6\,m$^2$ y
+mediana 77,0\,m$^2$, latitudes entre $-0{,}68$ y $11{,}34$, y ninguna fila con
+confianza (como se esperaba).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.25\textheight,keepaspectratio]{img/cap_ms_parquet.png}
+  \caption{Verificación del Parquet de Microsoft con DuckDB.}
+  \label{fig:ms-parquet}
+\end{figure}
+
+\subsection{Registro en MongoDB}
+\label{sec:ms-registro}
+
+La fuente queda en \campo{fuentes} (\campo{\_id="microsoft"}) con versión,
+licencia, SHA-256 global y, tras la carga, \campo{n\_registros}; cada etapa
+queda en \campo{bitacora\_cargas}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.2\textheight,keepaspectratio]{img/cap_ms_fuentes.png}
+  \caption{Documento de Microsoft en \campo{fuentes}.}
+  \label{fig:ms-fuentes}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.4\textheight,keepaspectratio]{img/cap_ms_bitacora.png}
+  \caption{Entradas de \campo{bitacora\_cargas} de Microsoft (parte de la
+  salida). Hay varias de \campo{descarga} y \campo{limpieza} porque cada corrida
+  deja su fila; las de \campo{limpieza} con 74\,600 registros son las pruebas
+  con \campo{--limite 4}, que procesan solo 4 archivos.}
+  \label{fig:ms-bitacora}
+\end{figure}
+
+\subsection{Alcance de la verificación}
+\label{sec:ms-limites}
+
+Lo que se comprobó: el pipeline es reproducible (dos corridas en máquinas
+distintas dieron las mismas cifras y el mismo SHA-256), el Parquet cumple el
+contrato y no tiene duplicados, y los totales son coherentes con los de Google
+(sección~\ref{sec:eda}). Lo que \textbf{no} se hizo: un cruce espacial
+independiente con GeoPandas sobre una muestra de municipios, pruebas
+automáticas, ni una inspección sistemática de los 28 polígonos reparados
+(solo se revisó uno a mano).
 
 % =====================================================================
 % 6. Esquema, carga e índices (Samuel)

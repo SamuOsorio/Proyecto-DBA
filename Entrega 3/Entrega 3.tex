@@ -798,13 +798,169 @@ por separado.\footnote{\pendiente{confirmar tras borrar \texttt{data/raw/} y cor
 \section{Análisis exploratorio breve}
 \label{sec:eda}
 
-\pendiente{Jose Eduardo. Material de contraste ya calculado: Google tiene unas
-1,53 veces más edificios que Microsoft pero más pequeños (media 82,4 frente a
-125,6\,m$^2$; mediana 57,9 frente a 77,0), y el área total es parecida
-($\approx$222 frente a $\approx$221\,km$^2$, calcular la suma exacta).
-Diferencias menores entre pipelines a mencionar: Google trae una columna
-\campo{cod\_mpio} vacía; hash MD5 frente a SHA-1; orientación de anillos;
-cálculo del centroide.}
+El EDA se hace en \campo{notebooks/eda\_edificios.ipynb}, sobre los dos Parquet
+intermedios que generó el flujo anterior (\campo{edificios\_google.parquet} y
+\campo{edificios\_microsoft.parquet}). Lee la geometría desde la columna WKB, así
+que no depende de que el Parquet traiga metadatos GeoParquet. Las cifras son de
+datos completos, sin muestreo. Cada edificio se asigna a una subregión PDET por
+su centroide (\campo{centroide\_lon}, \campo{centroide\_lat}), con la misma regla
+del centroide que la semana~4.
+
+\subsection{Totales y áreas por fuente}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}Lrrrr@{}}
+\toprule
+\textbf{Fuente} & \textbf{Edificios} & \textbf{Área total (km$^2$)} & \textbf{Área media (m$^2$)} & \textbf{Mediana (m$^2$)} \\
+\midrule
+Google Open Buildings & 2\,694\,786 & 222,17 & 82,45 & 57,87 \\
+Microsoft Building Footprints & 1\,761\,048 & 221,13 & 125,57 & 76,99 \\
+\bottomrule
+\end{tabularx}
+\caption{Totales por fuente sobre los 170 municipios PDET. Las áreas están en EPSG:9377.}
+\label{tab:eda-totales}
+\end{table}
+
+Google tiene unas 1,53 veces más edificios que Microsoft, pero son más pequeños:
+su área media es un tercio menor y su mediana es 25\,\% menor. Aun así, el área
+total es casi igual en las dos fuentes (diferencia de 1,04\,km$^2$, menos del
+0,5\,\%). Es decir, Google reparte la misma superficie en más huellas pequeñas.
+Los percentiles p10, p90 y p99 de la tabla completa (en el notebook) muestran la
+misma tendencia: en Microsoft la cola de edificios grandes es más larga (p99 de
+912\,m$^2$ frente a 445\,m$^2$ en Google, y máximo de 44\,668\,m$^2$ frente a
+20\,879\,m$^2$).
+
+\subsection{Confianza de Google}
+
+Google trae una columna \campo{confianza} entre 0,65 y 0,98 (media 0,78; mediana
+0,78). Ningún registro queda por debajo de 0,65, que es el umbral de la
+Entrega~1. Microsoft no trae confianza, así que el análisis de confianza es solo
+de Google (figura~\ref{fig:eda-confianza}).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.3\textheight,keepaspectratio]{img/eda_confianza_area.png}
+  \caption{Izquierda: distribución de áreas por fuente, en escala logarítmica.
+  Derecha: distribución de la confianza de Google.}
+  \label{fig:eda-confianza}
+\end{figure}
+
+\subsection{Edificios por subregión PDET}
+
+Las dos fuentes concentran sus edificios en las mismas subregiones, pero la
+proporción cambia. La Sierra Nevada - Perijá es la que más edificios tiene en
+Google (645\,009), seguida de Alto Patía y Norte del Cauca (388\,378) y Urabá
+Antioqueño (218\,242). En Microsoft, la Sierra Nevada baja a 295\,383 y Alto Patía
+y Norte del Cauca sigue en segundo lugar, con 271\,668. El Chocó es la subregión
+con menos edificios en Google (20\,722), pero no en Microsoft (37\,692). Eso ya es
+una señal de que las dos fuentes no cubren el territorio igual
+(figura~\ref{fig:eda-subregion}).
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}Lrr@{}}
+\toprule
+\textbf{Subregión PDET} & \textbf{Google} & \textbf{Microsoft} \\
+\midrule
+Sierra Nevada - Perijá & 645\,009 & 295\,383 \\
+Alto Patía y Norte del Cauca & 388\,378 & 271\,668 \\
+Urabá Antioqueño & 218\,242 & 113\,400 \\
+Montes de María & 215\,874 & 129\,388 \\
+Cuenca del Caguán y Piedemonte Caqueteño & 182\,694 & 133\,941 \\
+Bajo Cauca y Nordeste Antioqueño & 142\,783 & 102\,406 \\
+Putumayo & 136\,711 & 108\,450 \\
+Pacífico Medio & 116\,255 & 49\,596 \\
+Sur de Córdoba & 114\,887 & 80\,634 \\
+Macarena - Guaviare & 113\,455 & 94\,110 \\
+Arauca & 111\,739 & 74\,675 \\
+Catatumbo & 104\,277 & 89\,633 \\
+Sur de Bolívar & 80\,076 & 52\,856 \\
+Pacífico y Frontera Nariñense & 71\,020 & 79\,144 \\
+Sur del Tolima & 32\,662 & 48\,072 \\
+Chocó & 20\,722 & 37\,692 \\
+\bottomrule
+\end{tabularx}
+\caption{Edificios por subregión PDET, según la asignación por centroide.}
+\label{tab:eda-subregion}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.3\textheight,keepaspectratio]{img/eda_subregion.png}
+  \caption{Edificios por subregión PDET y fuente.}
+  \label{fig:eda-subregion}
+\end{figure}
+
+\subsection{Comparación entre fuentes}
+
+Para Google se compara \campo{area\_m2} (calculada en EPSG:9377) con
+\campo{area\_m2\_fuente} (\campo{area\_in\_meters} de Google). La correlación es
+prácticamente perfecta, y la diferencia relativa tiene mediana 0 y cuantiles 5\,\%
+y 95\,\% de $\pm$1\,\%. La diferencia absoluta mediana es de unos 0,2\,m$^2$. El
+mínimo es de $-$39\,\% y el máximo de +1\,\%: son huellas muy pequeñas, donde un
+redondeo cambia mucho el porcentaje. Eso valida el cálculo de área; no hay
+discrepancias sistemáticas (figura~\ref{fig:eda-comparacion}).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.3\textheight,keepaspectratio]{img/eda_comparacion.png}
+  \caption{Izquierda: \campo{area\_m2} frente a \campo{area\_m2\_fuente}
+  (escala log, 50\,000 puntos de muestra para graficar). Centro: diferencia
+  relativa, recortada a $\pm$50\,\%. Derecha: totales por fuente.}
+  \label{fig:eda-comparacion}
+\end{figure}
+
+\subsection{Mapa de control de cobertura}
+
+El mapa de densidad de centroides (figura~\ref{fig:eda-mapa}) muestra la cobertura
+de cada fuente sobre los municipios PDET. Hay cinco municipios sin edificios de
+Google: Murindó y Vigía del Fuerte (Antioquia), y Medio San Juan, Nóvita y Bojayá
+(Chocó). Microsoft sí tiene edificios en esos cinco, entre 1\,331 y 2\,004 cada
+uno. Otros municipios tienen muy pocos edificios en Google, como Sipí (1), López
+(24) y Condoto (239), mientras que en Microsoft tienen entre 653 y 5\,967. Los
+huecos de Google se concentran, así, en el Chocó y el Atrato antioqueño.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.4\textheight,keepaspectratio]{img/eda_mapa_densidad.png}
+  \caption{Densidad de centroides por fuente sobre los municipios PDET (escala log).}
+  \label{fig:eda-mapa}
+\end{figure}
+
+\subsection{Verificación}
+
+Como el repositorio no tiene pruebas automáticas, la verificación del EDA se
+apoya en cuatro comprobaciones. Los conteos del notebook (2\,694\,786 y
+1\,761\,048) coinciden con los documentos de MongoDB. No hay \campo{geom\_hash}
+duplicados en ninguna fuente. El notebook se ejecutó de punta a punta sobre los
+datos completos sin errores. Y la corrida desde cero de \campo{make edificios}
+reprodujo las mismas cifras.
+
+\subsection{Entorno de ejecución}
+
+El EDA y el flujo se corrieron en macOS con Python~3.12 en un entorno virtual con
+las dependencias de \campo{requirements.txt}, y con MongoDB~8 en Docker. El puerto
+por defecto (27017) estaba ocupado por otro contenedor, así que la base del
+proyecto se levantó en el puerto 27018, configurado en \campo{.env}. El MGN~2025
+se descargó del servicio de datos del geoportal del DANE. El informe se compiló con
+Tectonic~0.17.
+
+\subsection{Diferencias entre pipelines}
+
+Algunas diferencias entre las dos fuentes afectan la interpretación de las cifras:
+
+\begin{itemize}
+  \item Google trae la columna \campo{cod\_mpio} vacía, porque la asignación a
+        municipios se hace en la semana~4.
+  \item Microsoft no trae \campo{confianza} ni \campo{area\_m2\_fuente} (ambas quedan
+        en \campo{null}).
+  \item El Parquet de Microsoft no traía los metadatos GeoParquet que sí trae el de
+        Google. Se corrigió en el código (commit \texttt{7e33600}) y se regeneró;
+        el notebook no depende de ese metadato.
+  \item Las dos fuentes usan distinto proceso de origen: Google trae un área propia
+        y una confianza, mientras que el área de Microsoft se calcula por completo.
+\end{itemize}
 
 % =====================================================================
 % 8. Conclusiones
@@ -812,11 +968,34 @@ cálculo del centroide.}
 \section{Conclusiones y próximos pasos}
 \label{sec:conclusiones}
 
-\pendiente{Redactar al final, con las cifras definitivas. Puntos a cubrir:
-las dos fuentes quedan cargadas y reproducibles con \campo{make edificios};
-el hallazgo de la validación esférica de MongoDB
-(sección~\ref{sec:samuel3-s2}); y el paso a la semana 4: asignar cada edificio
-a su municipio con \campo{\$geoWithin} sobre \campo{centroide}, agregar en
-\campo{resultados} y producir las tablas y mapas finales.}
+Al cierre de la semana~3 quedan cargadas dos colecciones de huellas de edificios
+en MongoDB: \campo{edificios\_google} con 2\,694\,786 documentos y
+\campo{edificios\_microsoft} con 1\,761\,048, ambas dentro de los 170 municipios
+PDET. Las dos pasan la validación de \campo{\$jsonSchema}, tienen el índice
+\campo{2dsphere} sobre \campo{centroide} y \campo{geometry}, y el índice único
+\campo{geom\_hash} sin duplicados. Todo el flujo se corre con un solo comando,
+\campo{make edificios}, y la corrida desde cero (sin datos descargados) dio las
+mismas cifras que la primera ejecución.
+
+Del EDA se desprenden tres conclusiones para el análisis posterior. Primero, las
+dos fuentes cubren casi la misma superficie (222 y 221\,km$^2$), pero Google la
+reparte en huellas más pequeñas: su área mediana es de 58\,m$^2$ frente a
+77\,m$^2$ de Microsoft. Segundo, la cobertura no es homogénea: cinco municipios
+no tienen edificios en Google, y varios tienen muy pocos, sobre todo en el
+Chocó. Tercero, la confianza de Google (0,65 a 0,98) permite un análisis de
+sensibilidad en la semana~4, que Microsoft no permite porque no trae ese dato.
+
+Dos hallazgos del proceso afectan la semana~4. El primero es la validación
+esférica de MongoDB que obligó a reparar geometrías
+(sección~\ref{sec:samuel3-s2}). El segundo es que el Parquet de Microsoft no traía
+metadatos GeoParquet; se corrigió y se regeneró, así que ambas fuentes se leen
+igual.
+
+Para la semana~4 el paso siguiente es asignar cada edificio a un único
+municipio con \campo{\$geoWithin} sobre \campo{centroide}, agregar el número de
+edificios y el área total por municipio en \campo{resultados}, y producir las
+tablas y mapas finales. Antes de esa asignación conviene revisar los cinco
+municipios sin edificios en Google y decidir si se reportan aparte, porque ahí el
+resultado depende más de la fuente que del municipio.
 
 \end{document}

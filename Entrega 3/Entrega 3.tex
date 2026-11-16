@@ -206,7 +206,7 @@ PDET, 1\,761\,048 dentro, 28 inválidos reparados, 0 duplicados.}
 % =====================================================================
 \newcommand{\figsamuel}[2]{%
   \IfFileExists{img/#1.png}%
-    {\includegraphics[width=\textwidth]{img/#1.png}}%
+    {\includegraphics[width=\textwidth,height=0.4\textheight,keepaspectratio]{img/#1.png}}%
     {\pendiente{captura \texttt{#2}}}}
 
 \section{Esquema, carga e índices de edificios en MongoDB}
@@ -285,11 +285,11 @@ Decisiones de diseño:
 \textbf{Fuente} & \textbf{Documentos} & \textbf{Rechazados} &
 \textbf{Reparados (S2)} & \textbf{Tiempo (s)} & \textbf{Velocidad} \\
 \midrule
-Google    & 2\,694\,786 & 0 & 0  & 63,5 & 42\,468 docs/s \\
-Microsoft & 1\,761\,048 & 0 & 29 & 43,4 & 40\,608 docs/s \\
+Google    & 2\,694\,786 & 0 & 0  & 56,6 & 47\,621 docs/s \\
+Microsoft & 1\,761\,048 & 0 & 29 & 37,7 & 46\,753 docs/s \\
 \bottomrule
 \end{tabularx}
-\caption{Carga a MongoDB (corrida completa de \campo{make edificios}, MongoDB
+\caption{Carga a MongoDB (ejecución de \campo{carga.py}, MongoDB
 8 en Docker local, un solo equipo). Los tiempos dependen de la máquina.}
 \label{tab:carga-edif}
 \end{table}
@@ -336,10 +336,10 @@ sección~5.5) en las dos colecciones y mide cuánto tarda cada uno:
 \toprule
 \textbf{Índice} & \textbf{Para qué} & \textbf{Google (s)} & \textbf{Microsoft (s)} \\
 \midrule
-\campo{2dsphere} en \campo{centroide} & \campo{\$geoWithin} de la asignación (semana~4) & 7,0 & 4,4 \\
+\campo{2dsphere} en \campo{centroide} & \campo{\$geoWithin} de la asignación (semana~4) & 6,9 & 4,4 \\
 \campo{2dsphere} en \campo{geometry} & \campo{\$geoIntersects} en límites & \multicolumn{2}{c}{creado antes de cargar} \\
-\campo{cod\_mpio} & agregación por municipio & 4,7 & 1,4 \\
-\campo{geom\_hash} (único) & evitar duplicados & 3,5 & 2,3 \\
+\campo{cod\_mpio} & agregación por municipio & 2,2 & 1,4 \\
+\campo{geom\_hash} (único) & evitar duplicados & 3,4 & 2,3 \\
 \bottomrule
 \end{tabularx}
 \caption{Tiempo de creación de cada índice.}
@@ -374,10 +374,10 @@ con \campo{hint(\{\$natural: 1\})}.
 \midrule
 Google    & IXSCAN   & \campo{\$geoWithin} sobre \campo{centroide}   & 15\,303 & 0,44 \\
 Google    & IXSCAN   & \campo{\$geoIntersects} sobre \campo{geometry} & 15\,304 & 0,37 \\
-Google    & COLLSCAN & \campo{\$geoWithin} sin índice                 & 15\,303 & 2,97 \\
-Microsoft & IXSCAN   & \campo{\$geoWithin} sobre \campo{centroide}   & 12\,547 & 0,33 \\
-Microsoft & IXSCAN   & \campo{\$geoIntersects} sobre \campo{geometry} & 12\,548 & 0,29 \\
-Microsoft & COLLSCAN & \campo{\$geoWithin} sin índice                 & 12\,547 & 1,95 \\
+Google    & COLLSCAN & \campo{\$geoWithin} sin índice                 & 15\,303 & 2,93 \\
+Microsoft & IXSCAN   & \campo{\$geoWithin} sobre \campo{centroide}   & 12\,547 & 0,32 \\
+Microsoft & IXSCAN   & \campo{\$geoIntersects} sobre \campo{geometry} & 12\,548 & 0,28 \\
+Microsoft & COLLSCAN & \campo{\$geoWithin} sin índice                 & 12\,547 & 1,93 \\
 \bottomrule
 \end{tabularx}
 \caption{Planes de ejecución y tiempos en Caldono. Es una sola consulta por
@@ -386,7 +386,7 @@ caso, así que los tiempos son indicativos, no un \emph{benchmark}.}
 \end{table}
 
 Con el índice, la consulta de asignación corre unas 6,7 veces más rápido en
-Google y unas 5,9 en Microsoft que sin él, con el mismo resultado. La
+Google y unas 6,0 en Microsoft que sin él, con el mismo resultado. La
 diferencia de un edificio entre \campo{\$geoWithin} (centroide dentro) y
 \campo{\$geoIntersects} (huella que toca el municipio) corresponde a un
 edificio que cruza el límite: es la razón de usar el centroide como regla de
@@ -398,8 +398,8 @@ asignación, para que cada edificio pertenezca a un solo municipio.
 \toprule
 \textbf{Colección} & \textbf{Documentos} & \textbf{Datos (MB)} & \textbf{Índices (MB)} & \textbf{Mayor índice} \\
 \midrule
-\campo{edificios\_google}    & 2\,694\,786 & 1\,279 & 251 & \campo{geom\_hash} (111 MB) \\
-\campo{edificios\_microsoft} & 1\,761\,048 & 835    & 194 & \campo{geom\_hash} (88 MB) \\
+\campo{edificios\_google}    & 2\,694\,786 & 1\,279 & 245 & \campo{geom\_hash} (111 MB) \\
+\campo{edificios\_microsoft} & 1\,761\,048 & 835    & 175 & \campo{geom\_hash} (88 MB) \\
 \bottomrule
 \end{tabularx}
 \caption{Tamaño de las colecciones (\campo{collStats}).}
@@ -429,8 +429,15 @@ por separado.\footnote{\pendiente{confirmar tras borrar \texttt{data/raw/} y cor
 
 \begin{figure}[H]
   \centering
-  \figsamuel{cap_run_edificios}{make edificios}
-  \caption{Final de la ejecución de \campo{make edificios}.}
+  \includegraphics[width=\textwidth,height=0.22\textheight,keepaspectratio]{img/cap_run_google.png}\\[4pt]
+  \includegraphics[width=\textwidth,height=0.15\textheight,keepaspectratio]{img/cap_run_microsoft.png}\\[4pt]
+  \includegraphics[width=\textwidth,height=0.28\textheight,keepaspectratio]{img/cap_run_edificios.png}
+  \caption{Ejecución de \campo{make edificios}: tabla de control de Google,
+  tabla de control de Microsoft y final del flujo (carga, índices y evidencia
+  de Microsoft). La tabla de Google reimprime el tiempo de descarga de la
+  corrida original, porque en esta los archivos ya estaban descargados. Los
+  tiempos de carga de esta corrida difieren algo de los de la
+  tabla~\ref{tab:carga-edif}, que salen de \campo{carga.py}.}
   \label{fig:cap-run-edif}
 \end{figure}
 

@@ -962,6 +962,89 @@ Algunas diferencias entre las dos fuentes afectan la interpretación de las cifr
         y una confianza, mientras que el área de Microsoft se calcula por completo.
 \end{itemize}
 
+\subsection{Correcciones a las figuras del EDA}
+\label{sec:eda-correcciones}
+
+Las cuatro figuras de la primera versión del EDA se rehicieron con un script y
+un estilo común (\campo{src/analisis/figuras\_eda.py} y \campo{estilo.py}). Cada
+pareja muestra la versión anterior (izquierda) y la actual (derecha). Los cambios
+fueron los siguientes.
+
+\begin{itemize}
+  \item \textbf{Subregiones.} Los nombres estaban en minúscula, las etiquetas
+        giradas ocupaban casi todo el eje y el eje tenía miles sin separar. Ahora
+        las barras son horizontales, los nombres tienen mayúscula inicial correcta
+        y los miles están separados.
+  \item \textbf{Comparación.} El histograma de diferencia usaba un rango de
+        $\pm$3\,\% que dejaba casi toda la masa en una columna; ahora recorta a
+        $\pm$1\,\%. La dispersión usa \campo{hexbin} con recta 1:1, y el conteo de
+        edificios se reemplazó por el área total en km$^2$.
+  \item \textbf{Confianza y áreas.} El eje de área estaba en $\log_{10}$ y el eje
+        de proporciones no tenía etiqueta; ahora la escala es logarítmica real con
+        marcas en 10, 100 y 1\,000\,m$^2$, las medianas por fuente se marcan con
+        líneas y los umbrales de confianza 0,70 y 0,75 se señalan.
+  \item \textbf{Mapa de densidad.} Tenía ejes de coordenadas en inglés y títulos
+        en minúscula, y no resaltaba los cinco municipios sin edificios de Google.
+        Ahora no tiene ejes, usa la misma escala de color en ambos paneles, y los
+        municipios sin edificios están numerados en rojo con su lista.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \begin{minipage}[t]{0.48\textwidth}\centering
+    \includegraphics[width=\textwidth,height=0.3\textheight,keepaspectratio]{img/antes_eda_subregion.png}\\[2pt]
+    {\small Antes}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.48\textwidth}\centering
+    \includegraphics[width=\textwidth,height=0.3\textheight,keepaspectratio]{img/eda_subregion.png}\\[2pt]
+    {\small Después}
+  \end{minipage}
+  \caption{Edificios por subregión PDET: versión anterior y actual.}
+  \label{fig:corr-subregion}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{minipage}[t]{0.48\textwidth}\centering
+    \includegraphics[width=\textwidth,height=0.22\textheight,keepaspectratio]{img/antes_eda_comparacion.png}\\[2pt]
+    {\small Antes}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.48\textwidth}\centering
+    \includegraphics[width=\textwidth,height=0.22\textheight,keepaspectratio]{img/eda_comparacion.png}\\[2pt]
+    {\small Después}
+  \end{minipage}
+  \caption{Comparación entre fuentes: versión anterior y actual.}
+  \label{fig:corr-comparacion}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{minipage}[t]{0.48\textwidth}\centering
+    \includegraphics[width=\textwidth,height=0.22\textheight,keepaspectratio]{img/antes_eda_confianza_area.png}\\[2pt]
+    {\small Antes}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.48\textwidth}\centering
+    \includegraphics[width=\textwidth,height=0.22\textheight,keepaspectratio]{img/eda_confianza_area.png}\\[2pt]
+    {\small Después}
+  \end{minipage}
+  \caption{Distribución de áreas y confianza: versión anterior y actual.}
+  \label{fig:corr-confianza}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{minipage}[t]{0.48\textwidth}\centering
+    \includegraphics[width=\textwidth,height=0.3\textheight,keepaspectratio]{img/antes_eda_mapa_densidad.png}\\[2pt]
+    {\small Antes}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.48\textwidth}\centering
+    \includegraphics[width=\textwidth,height=0.3\textheight,keepaspectratio]{img/eda_mapa_densidad.png}\\[2pt]
+    {\small Después}
+  \end{minipage}
+  \caption{Densidad de centroides por fuente: versión anterior y actual.}
+  \label{fig:corr-mapa}
+\end{figure}
+
 % =====================================================================
 % 8. Conclusiones
 % =====================================================================

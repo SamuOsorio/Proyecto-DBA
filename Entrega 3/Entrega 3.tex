@@ -172,9 +172,40 @@ ajuste: el Parquet intermedio no lleva \campo{cod\_mpio} ni \campo{lote\_id};
 el segundo lo pone la carga y el primero queda en \campo{null} hasta la
 semana 4.
 
-\pendiente{Tabla del diccionario de \campo{edificios\_*} y diagrama E-R
-(se puede reutilizar \ruta{../Entrega 2/img/diagrama_er.png}); Samuel, sección
-\ref{sec:samuel3-schema}, ya describe el validador.}
+La figura~\ref{fig:er3} recuerda el esquema completo y la
+tabla~\ref{tab:dicc-edif} es el diccionario de las dos colecciones de
+edificios tal como quedó en el validador (sección~\ref{sec:samuel3-schema}).
+Cada edificio se relaciona con su municipio por \campo{cod\_mpio}, que se
+calcula con la regla del centroide, y con su carga por \campo{lote\_id}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.4\textheight,keepaspectratio]{img/diagrama_er.png}
+  \caption{Diagrama E-R del esquema en MongoDB (Entrega 1).}
+  \label{fig:er3}
+\end{figure}
+
+\begin{table}[H]
+\centering\small
+\caption{Diccionario de \campo{edificios\_google} y \campo{edificios\_microsoft}.}
+\label{tab:dicc-edif}
+\begin{tabularx}{\textwidth}{@{}p{2.8cm}p{3.1cm}Lp{2.4cm}@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo (validador)} & \textbf{Descripción} & \textbf{Origen} \\
+\midrule
+\campo{\_id} & ObjectId & Identificador interno & MongoDB \\
+\campo{fuente\_id} & \campo{google} o \campo{microsoft} & Referencia a \campo{fuentes} & Calculado \\
+\campo{geometry} & GeoJSON \campo{Polygon} & Huella del edificio en WGS84 & Fuente \\
+\campo{centroide} & GeoJSON \campo{Point} (2 double) & Centroide de la huella; base de la asignación & Calculado (EPSG:9377) \\
+\campo{area\_m2} & double $\geq 0$ & Área de la huella & Calculado (EPSG:9377) \\
+\campo{area\_m2\_fuente} & double o null & Área reportada por Google (\campo{area\_in\_meters}); null en Microsoft & Fuente \\
+\campo{confianza} & double en $[0,1]$ o null & Confianza del modelo (0,65 a 1,0); null en Microsoft & Fuente \\
+\campo{cod\_mpio} & string de 5 dígitos o null & Referencia a \campo{municipios}; null hasta la asignación de la semana~4 & Calculado \\
+\campo{geom\_hash} & string (índice único) & Hash de la geometría para descartar duplicados & Calculado \\
+\campo{lote\_id} & ObjectId & Referencia a la carga en \campo{bitacora\_cargas} & Calculado \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 % =====================================================================
 % 4. Google (Jorge)
@@ -773,9 +804,9 @@ SHA-256 de la fuente; la limpieza regenera el Parquet y la carga es idempotente.
 \campo{make edificios} sobre datos ya descargados y se obtuvieron
 exactamente las mismas cifras que en la primera ejecución (2\,694\,786 y
 1\,761\,048 documentos, 29 reparados en Microsoft). Esto verifica el flujo y
-la idempotencia; \textbf{no} es una descarga desde cero, que se probó
-por separado.\footnote{\pendiente{confirmar tras borrar \texttt{data/raw/} y correr
-\texttt{make edificios}; ajustar o quitar esta nota.}}
+la idempotencia; \textbf{no} es una descarga desde cero. La corrida
+completa con \campo{make all} sobre una base vacía se documenta en la
+Entrega~4.
 
 \begin{figure}[H]
   \centering

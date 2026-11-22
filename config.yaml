@@ -40,3 +40,14 @@ edificios:
   salida_parquet:
     google: data/processed/edificios_google.parquet
     microsoft: data/processed/edificios_microsoft.parquet
+
+analisis:
+  # Umbrales de confianza de Google para la sensibilidad. El primero es el
+  # escenario base (el mínimo del dataset) y debe coincidir con
+  # edificios.umbral_confianza_google_default. Microsoft no tiene confianza.
+  umbrales_google: [0.65, 0.70, 0.75]
+  regla_asignacion: "centroide $geoWithin municipio (EPSG:4326, esférico)"
+  salida_csv:
+    municipio: data/processed/resultados_municipio.csv
+    subregion: data/processed/resultados_subregion.csv
+  carpeta_informe: Entrega 4

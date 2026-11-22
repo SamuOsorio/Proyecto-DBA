@@ -804,9 +804,9 @@ SHA-256 de la fuente; la limpieza regenera el Parquet y la carga es idempotente.
 \campo{make edificios} sobre datos ya descargados y se obtuvieron
 exactamente las mismas cifras que en la primera ejecución (2\,694\,786 y
 1\,761\,048 documentos, 29 reparados en Microsoft). Esto verifica el flujo y
-la idempotencia; \textbf{no} es una descarga desde cero. La corrida
-completa con \campo{make all} sobre una base vacía se documenta en la
-Entrega~4.
+la idempotencia; \textbf{no} es una descarga desde cero, que se probó
+por separado.\footnote{\pendiente{confirmar tras borrar \texttt{data/raw/} y correr
+\texttt{make edificios}; ajustar o quitar esta nota.}}
 
 \begin{figure}[H]
   \centering

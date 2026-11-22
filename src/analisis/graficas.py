@@ -100,7 +100,7 @@ def figura_sensibilidad() -> object:
         eje.set_title(titulo)
         if fmt:
             eje.yaxis.set_major_formatter(fmt)
-        eje.set_ylim(0, max(g[col].max(), m[col]) * 1.25)
+        eje.set_ylim(0, max(g[col].max(), m[col]) * 1.4)
     ejes[0].legend(frameon=False, loc="lower left", fontsize=8)
     fig.tight_layout()
     return guardar(fig, "res_sensibilidad_umbral")

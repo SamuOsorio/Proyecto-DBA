@@ -22,6 +22,8 @@ data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+!data/processed/resultados_municipio.csv
+!data/processed/resultados_subregion.csv
 __pycache__/
 *.pyc
 .venv/

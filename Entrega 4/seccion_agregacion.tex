@@ -1,0 +1,114 @@
+\section{Agregación en \texorpdfstring{\campo{resultados}}{resultados} y sensibilidad}
+\label{sec:agregacion}
+
+Esta sección cubre \campo{agregacion.py}, \campo{exportar.py} y
+\campo{sensibilidad.py}, en \campo{src/analisis/}. Parten de los edificios
+ya asignados (sección anterior) y calculan, para cada municipio, fuente y
+umbral de confianza, las métricas de la ecuación~(1) de la Entrega~1.
+
+\subsection{Colección \texorpdfstring{\campo{resultados}}{resultados}}
+
+\campo{agregacion.py} crea \campo{resultados} con validación
+\campo{\$jsonSchema} estricta, derivada del diccionario de la Entrega~1. Hay
+un cambio respecto a ese diccionario: la llave pasa de
+\campo{\{cod\_mpio, fuente\_id\}} a \campo{\{cod\_mpio, fuente\_id, umbral\}},
+para guardar la sensibilidad en la misma colección sin crear otra. Microsoft
+no tiene confianza y lleva \campo{umbral: null}. \campo{area\_media\_m2}
+acepta \campo{null} porque un municipio sin edificios no tiene media.
+\campo{parametros} guarda el umbral, la regla de asignación, el CRS de las
+áreas y el commit del código que produjo el documento.
+
+\subsection{Pipeline de agregación}
+
+Cada combinación de fuente y umbral es una sola pipeline que corre dentro de
+MongoDB:
+
+\begin{lstlisting}[language=Python]
+[{"$match": {"cod_mpio": {"$ne": None},
+             "confianza": {"$gte": u}}},     # solo Google
+ {"$group": {"_id": "$cod_mpio", "n": {"$sum": 1},
+             "area": {"$sum": "$area_m2"},
+             "media": {"$avg": "$area_m2"}}},
+ {"$lookup": {"from": "municipios", "localField": "_id",
+              "foreignField": "_id", "as": "m"}},
+ {"$unwind": "$m"},
+ {"$project": {"_id": {"cod_mpio": "$_id", "fuente_id": f, "umbral": u},
+   "n_edificios": "$n", "area_total_m2": "$area", "area_media_m2": "$media",
+   "densidad_km2": {"$divide": ["$n", "$m.area_km2"]},
+   "pct_techos": {"$multiply": [100, {"$divide":
+       ["$area", {"$multiply": ["$m.area_km2", 1e6]}]}]},
+   "parametros": {...}, "fecha_calculo": "$$NOW"}},
+ {"$merge": {"into": "resultados", "on": "_id",
+             "whenMatched": "replace"}}]
+\end{lstlisting}
+
+Una segunda pipeline, sobre \campo{municipios}, completa con ceros los
+municipios que no tienen edificios (\campo{\$merge} con
+\campo{whenMatched: "keepExisting"}), así siempre hay 170 documentos por
+fuente y umbral. Antes de escribir se borran los documentos de esa fuente y
+umbral, de modo que correr el script dos veces deja exactamente lo mismo: en
+la segunda corrida se reemplazaron los 170 documentos de cada combinación y
+las cifras no cambiaron. Los umbrales se leen de \campo{config.yaml}
+(\campo{analisis.umbrales\_google: [0.65, 0.70, 0.75]}), no están escritos en
+el código. Cada pipeline tardó entre 4,2 y 4,5\,s en Google y 1,9\,s en
+Microsoft, y cada corrida queda en \campo{bitacora\_cargas}
+(\campo{etapa: "analisis"}).
+
+\subsection{Verificación}
+
+Después de escribir, el script comprueba dos cosas para cada fuente y umbral:
+que haya 170 documentos y que la suma de \campo{n\_edificios} sea igual al
+número de edificios asignados que pasan el filtro de confianza. Si alguna
+falla, el script termina con error. Las cuatro combinaciones pasaron:
+
+\begin{itemize}
+  \item Google 0,65: 2\,694\,785 edificios, que es el total de la colección
+        (2\,694\,786) menos el único sin municipio.
+  \item Google 0,70 y 0,75: 2\,263\,445 y 1\,751\,076, iguales al conteo
+        directo de edificios con \campo{cod\_mpio} y confianza mayor o igual
+        al umbral.
+  \item Microsoft: 1\,761\,048, el total de la colección.
+\end{itemize}
+
+En Google, 5 municipios quedan en cero con cualquier umbral (Murindó, Vigía
+del Fuerte, Bojayá, Medio San Juan y Nóvita, los mismos del EDA) y Sipí pasa
+a cero desde 0,70 porque su único edificio tiene confianza menor a 0,70. En
+Microsoft los 170 municipios tienen edificios.
+
+\subsection{Resultados por subregión}
+
+\campo{exportar.py} agrupa \campo{resultados} por subregión con
+\campo{\$lookup} y \campo{\$group} en MongoDB y genera
+\ruta{data/processed/resultados_municipio.csv} (680 filas: 170 municipios por
+cuatro combinaciones de fuente y umbral) y
+\ruta{data/processed/resultados_subregion.csv}. Los dos CSV se versionan para
+que los mapas y el ranking se puedan rehacer sin la base.
+
+\input{tabla_subregion.tex}
+
+Las dos fuentes casi coinciden en área total (222,17 y 221,13\,km\textsuperscript{2})
+aunque Google tiene 1,53 veces más edificios, porque divide la misma
+superficie en huellas más pequeñas. Por subregión, Google tiene más área en el
+Caribe (Sierra Nevada - Perijá, Urabá, Montes de María) y Microsoft en el
+Pacífico y el sur (Chocó, Sur del Tolima, Pacífico y Frontera Nariñense), donde
+$D$ llega a $-0{,}33$. Los conteos por subregión coinciden con los del EDA de
+la Entrega~3 salvo en Catatumbo, con un edificio de diferencia: el EDA usó el
+centroide que trae Google y aquí se usa el \campo{centroide} recalculado en
+EPSG:9377.
+
+\subsection{Sensibilidad al umbral de confianza}
+
+\campo{sensibilidad.py} compara los tres umbrales de Google con Microsoft
+como referencia.
+
+\input{sensibilidad.tex}
+
+Subir el umbral quita muchos más edificios que área: con 0,70 se pierde el
+16\,\% de los edificios pero solo el 7\,\% del área, y con 0,75 el 35\,\% y el
+19\,\%. Los edificios de baja confianza son, sobre todo, huellas pequeñas.
+Aun así, el área con 0,75 (179,6\,km\textsuperscript{2}) queda 19\,\% por
+debajo de Microsoft, mientras que con 0,65 las dos fuentes casi coinciden.
+El orden de los municipios es estable: los 15 con más área de techos con 0,65
+siguen en el top 15 con 0,70, y 14 de 15 con 0,75. Por eso se deja 0,65 como
+escenario base, y la sensibilidad muestra que la elección del umbral afecta
+el total pero no cuáles municipios encabezan el ranking.

@@ -1,0 +1,5 @@
+﻿fuente,municipio,plan,indice,devueltos,claves_examinadas,docs_examinados,ms
+google,CALDONO (19137),IXSCAN,centroide_2dsphere,15303,25103,25071,730
+google,CALDONO (19137),COLLSCAN,-,15303,0,2694786,7310
+microsoft,CALDONO (19137),IXSCAN,centroide_2dsphere,12547,19460,19428,749
+microsoft,CALDONO (19137),COLLSCAN,-,12547,0,1761048,4538

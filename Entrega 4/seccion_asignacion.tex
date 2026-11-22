@@ -1,0 +1,69 @@
+\section{Asignación por centroide y validación}
+
+\subsection{Procedimiento}
+Para cada uno de los 170 municipios PDET se ejecutó un \texttt{updateMany}
+con \texttt{\$geoWithin} sobre el campo \texttt{centroide} y el filtro
+\texttt{cod\_mpio: null}, en \texttt{edificios\_google} y
+\texttt{edificios\_microsoft}. El filtro evita reasignar edificios ya
+asignados y se midió el tiempo por fuente. La ejecución quedó registrada
+en \texttt{bitacora\_cargas}.
+
+\subsection{Resultados de la asignación}
+\input{asignacion_resumen.tex}
+
+La asignación de Google (2.694.786 edificios) tardó 269,9\,s y la de
+Microsoft (1.761.048 edificios), 182,1\,s. En Microsoft todos los edificios
+quedaron asignados; en Google, 2.694.785 de 2.694.786.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{img/cap_asignacion.png}
+  \caption{Salida de la asignación por centroide.}
+\end{figure}
+
+\subsection{Edificios sin municipio}
+Un único edificio de Google (0,000037\,\%) quedó con \texttt{cod\_mpio: null}.
+Su centroide (-72,97638; 9,15139) está a 0,011\,m del límite del municipio de
+Convención (54206), es decir, prácticamente sobre la frontera. En un caso
+así, la diferencia entre las aristas geodésicas que usa \texttt{\$geoWithin}
+sobre la esfera y las aristas planas de la geometría puede decidir si el
+punto queda dentro o fuera. En Microsoft no hubo ningún caso.
+
+\subsection{Plan de ejecución: IXSCAN frente a COLLSCAN}
+Se ejecutó \texttt{explain("executionStats")} sobre una consulta
+\texttt{\$geoWithin} para el municipio de Caldono (19137), primero con el
+índice \texttt{centroide\_2dsphere} y luego forzando
+\texttt{hint(\{\$natural: 1\})}.
+
+\input{evidencia_geowithin.tex}
+
+Con el índice, la consulta de Google examinó 25.071 documentos en 730\,ms;
+sin él, recorrió los 2.694.786 documentos en 7.310\,ms, es decir, 107 veces
+más documentos y 10 veces más tiempo. En Microsoft, 19.428 documentos en
+749\,ms frente a 1.761.048 en 4.538\,ms (91 veces más documentos y 6 veces
+más tiempo). Ambas variantes devolvieron los mismos resultados (15.303 y
+12.547 edificios). El índice examina más documentos que los devueltos
+porque primero filtra por celdas S2 y luego verifica la geometría exacta.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{img/cap_explain_geowithin.png}
+  \caption{\texttt{explain("executionStats")} con \texttt{IXSCAN} y con \texttt{COLLSCAN}.}
+\end{figure}
+
+\subsection{Validación independiente con GeoPandas}
+Se validó una muestra de 10 municipios: dos del Chocó, tres grandes, tres
+pequeños y dos sin edificios de Google (Murindó y Vigía del Fuerte). Los
+centroides se cruzaron contra los límites con
+\texttt{sjoin(predicate="within")} y se compararon los conteos con los de
+MongoDB.
+
+\input{validacion_asignacion.tex}
+
+En las 20 comparaciones (10 municipios por 2 fuentes) la diferencia fue 0,
+sin edificios exclusivos de MongoDB ni de GeoPandas. Los dos municipios sin
+Google dieron 0 en ambos métodos, y para Microsoft coincidieron en 1.331 y
+1.714 edificios. Así, la asignación en MongoDB coincide con una
+implementación independiente en el plano. La muestra no incluye el edificio
+de Convención, por lo que el efecto de borde descrito arriba no aparece en
+esta tabla.

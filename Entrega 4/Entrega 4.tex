@@ -1,0 +1,111 @@
+% =====================================================================
+% DBA - Proyecto final - Entrega 4
+% Asignación por centroide, agregación en resultados, sensibilidad y lectura de resultados
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+% =====================================================================
+% Preámbulo compartido - DBA Proyecto final
+% =====================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}{}
+\usepackage[spanish,es-noshorthands,es-tabla]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,array}
+\usepackage{enumitem}
+\usepackage[dvipsnames,table]{xcolor}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{calc,positioning}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+
+% --- Colores --------------------------------------------------------
+\definecolor{acento}{HTML}{2F6FDB}
+\definecolor{gris}{HTML}{6B6B6B}
+\hypersetup{colorlinks=true, linkcolor=acento, urlcolor=acento, citecolor=acento}
+
+% --- Tablas ---------------------------------------------------------
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.25}
+
+% --- Listas ---------------------------------------------------------
+\setlist{itemsep=2pt, topsep=4pt}
+
+% --- Código (JSON / mongosh) ----------------------------------------
+\lstdefinestyle{codigo}{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{gray!50},
+  backgroundcolor=\color{gray!6},
+  xleftmargin=4pt, xrightmargin=4pt,
+  showstringspaces=false,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+           {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+           {ñ}{{\~n}}1 {Ñ}{{\~N}}1
+}
+\lstset{style=codigo}
+
+% --- Atajos ---------------------------------------------------------
+\newcommand{\campo}[1]{\texttt{#1}}
+\newcommand{\pendiente}[1]{\textcolor{gris}{\textit{[Pendiente -- #1]}}}
+% Ruta de archivo larga: igual que \campo pero se puede partir en / y _
+% (xurl ya amplía los puntos de corte de \url para que esto funcione).
+\newcommand{\ruta}[1]{\begingroup\urlstyle{tt}\url{#1}\endgroup}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  {\large Pontificia Universidad Javeriana\par}
+  {\large Departamento de Ingeniería de Sistemas\par}
+  \vspace{0.8cm}
+  {\large Administración de Bases de Datos (DBA) -- 2026-30\par}
+  \vspace{2.5cm}
+  {\Huge\bfseries Proyecto final\par}
+  \vspace{1cm}
+  {\LARGE Entrega 4: Asignación por centroide, resultados y sensibilidad\par}
+  \vspace{1cm}
+  {\large Potencial solar en techos de los municipios PDET\par}
+  \vspace{3cm}
+  {\large
+    Maria Camila Beltran \\
+    \vspace{0.5cm}
+    Jorge Fortich \\
+    \vspace{0.5cm}
+    Jose Eduardo Valeriano \\
+    \vspace{0.5cm}
+    Samuel Osorio Rodríguez\par}
+  \vspace{3cm}
+  {\large Profesor: Andrés Oswaldo Calderón Romero, Ph.D.\par}
+  \vspace{3cm}
+  {\large {Noviembre 2026}\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+% 1. Asignación por centroide (Jorge)
+% =====================================================================
+\input{seccion_asignacion.tex}
+
+% =====================================================================
+% 2. Agregación en resultados y sensibilidad (Samuel)
+% =====================================================================
+\input{seccion_agregacion.tex}
+
+% =====================================================================
+% 3. Lectura de los resultados (Jose Eduardo)
+% =====================================================================
+\input{seccion_resultados.tex}
+
+\end{document}

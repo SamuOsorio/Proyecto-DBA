@@ -1,121 +1,92 @@
-# Proyecto-DBA
+# 01 · Producto
 
-Potencial solar en techos de los municipios PDET. Proyecto final del curso
-Administración de Bases de Datos (DBA), Pontificia Universidad Javeriana — 2026-30.
+[← Índice de la wiki](../Home.md)
 
-Estima, para cada uno de los 170 municipios PDET, el número de edificaciones y
-el área total de techos disponible para paneles solares, comparando fuentes
-abiertas de huellas de edificios (Google Open Buildings y Microsoft Building
-Footprints) sobre los límites municipales oficiales del DANE (MGN 2025), con
-MongoDB e índices espaciales.
+**Qué responde esta carpeta:** qué se construye, para quién, qué se dejó fuera, qué decidió el PO y qué se aceptó.
 
-El diseño completo (plan de implementación, diagrama E-R y diccionario de
-datos) está en [`Entrega 1/Entrega 1.pdf`](<Entrega 1/Entrega 1.pdf>). La carga de
-municipios, los índices espaciales y su evidencia están en
-[`Entrega 2/Entrega 2.pdf`](<Entrega 2/Entrega 2.pdf>), que también resume el plan y el
-modelo de datos.
+## Ficha de la carpeta
 
-## Estado
+| Campo | Valor |
+|---|---|
+| **Propósito** | Que cualquier integrante sepa qué hace MANI, por qué, con qué reglas de negocio y qué se aceptó de cada incremento, y pueda rastrear cada decisión de producto hasta su historia en Jira. |
+| **Responsable** | Camila Beltrán (Product Owner) |
+| **Suplente** | Sara Albarracín (Scrum Master). Ver [§1.1](#11-suplencia). |
+| **Quién la consume** | Desarrollo (qué construir y con qué criterio), QA (de dónde salen los casos de prueba), Arquitectura (qué requisito origina cada decisión) y la sustentación (qué se entregó). |
+| **Cada cuánto se actualiza** | Al cerrar cada sprint, y el mismo día en que el PO toma una decisión de producto. |
+| **Última revisión de la carpeta** | 2026-11-17 ([SCRUM-1689](https://maniservices.atlassian.net/browse/SCRUM-1689), HU-WIKI-01) |
+| **Barrido de secretos** | 2026-11-17: sin credenciales en la carpeta. Se buscaron valores, no palabras: JWT (`eyJ…`), llaves de Supabase (`sb_…`), llaves de AWS (`AKIA…`), bloques `BEGIN … PRIVATE KEY` y asignaciones del tipo `password=…`, `secret=…`, `token=…`. **0 coincidencias.** Las cuentas de prueba de QA **no** se publican aquí. |
 
-| Semana | Fase | Estado |
+La carpeta tiene dos capas, y cada documento vive en una sola:
+
+| Capa | Qué es | Dónde |
 |---|---|---|
-| 1 | Infraestructura (Docker, esquema `$jsonSchema`) | Hecha |
-| 2 | Límites PDET: 170 municipios cargados e indexados | Hecha (Entrega 2) |
-| 3 | Huellas de edificios (Google y Microsoft): 2.694.786 y 1.761.048 edificios cargados e indexados, EDA en `notebooks/eda_edificios.ipynb` | Hecha (Entrega 3) |
-| 4 | Asignación por centroide, `resultados` (170 documentos por fuente y umbral), sensibilidad, mapas y ranking | Hecha (Entrega 4) |
-| Final | Informe técnico autocontenido para la UPME | 26 de noviembre |
+| Páginas de lectura | Ordenan y resumen; no deciden | `vision-y-alcance.md`, `actores-y-ciclo-del-servicio.md`, `requisitos.md`, `criterios-de-exito.md`, `mapa-de-modulos.md` |
+| Fuentes | Lo que manda: requisitos, decisiones del PO y actas | `SRS.md`, `decisiones-del-po.md`, `acta-aceptacion-SCRUM-1470.md` |
 
-## Cómo correr el proyecto
+Si una página de lectura y una fuente se contradicen, manda la fuente. Si el SRS y una decisión del PO posterior se contradicen, manda la decisión del PO con su fecha, y el SRS se corrige.
 
-Requisitos: Docker + Docker Compose, Python 3.12.
+### 1.1 Suplencia
 
-```bash
-cp .env.example .env            # ajustar usuario/contraseña si hace falta
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+Decidido por la PO el 2026-11-17. Suple la **Scrum Master**, porque ya es quien facilita y redacta las actas que firma el PO ([`VALIDACION_HU-VAL-01.md`](../06-gobernanza/VALIDACION_HU-VAL-01.md), fila D12) y quien registra las decisiones del PO en la wiki. La suplencia cubre **mantener** la carpeta; **no** cubre decidir: si falta la PO, una decisión de producto espera o se escala según [Roles y decisiones](../04-proceso/roles-y-decisiones.md).
 
-make up                         # levanta MongoDB 8 en Docker
-make schema                     # crea las colecciones con $jsonSchema (semana 1)
-make municipios                 # descarga, valida y carga los municipios PDET (semana 2)
-make edificios                  # descarga, limpia, carga e indexa edificios de Google y Microsoft (semana 3)
-make analisis                   # asigna, agrega, exporta y genera tablas, mapas y ranking (semana 4)
-```
+## 1. Orden de lectura
 
-`make all` corre todo lo anterior seguido, desde una base vacía. Para retomar el
-análisis desde un paso: `python -m src.analisis.run --desde agregacion`. Para
-rehacer solo los mapas y el ranking sin MongoDB (leen los CSV y el GeoJSON
-versionados): `python -m src.analisis.run --solo-figuras`.
+| # | Qué leer | Dónde | Por qué va aquí |
+|---|---|---|---|
+| 1 | **Visión y alcance**: qué resuelve MANI y qué entra en el MVP | [Visión y alcance](vision-y-alcance.md) | Sin el problema, nada de lo demás tiene sentido |
+| 2 | **Actores y ciclo del servicio** | [Actores y ciclo del servicio](actores-y-ciclo-del-servicio.md) | Quién usa el sistema y por qué pasos avanza un servicio |
+| 3 | **Mapa de módulos M-01 a M-13 con su dueño** | [Mapa de módulos](mapa-de-modulos.md) | Cómo se reparte el producto y a quién preguntar |
+| 4 | **Requisitos y reglas de negocio** | [`SRS.md`](SRS.md) §3, §4 y §6, y su índice [Requisitos](requisitos.md) | Qué debe hacer el sistema y con qué restricciones |
+| 5 | **Decisiones del PO** (con fecha y enlace a Jira) | [Decisiones del PO](decisiones-del-po.md) | Precisan o cambian reglas del SRS; mandan sobre él |
+| 6 | **Criterios de éxito y actas de aceptación** | [Criterios de éxito](criterios-de-exito.md) y [Acta de la SCRUM-1470](acta-aceptacion-SCRUM-1470.md) | Qué se considera terminado y qué se aceptó del incremento |
 
-El MGN 2025 no tiene enlace directo y estable: descarga `MGN2025_MPIO_GRAFICO.zip`
-del [geoportal del DANE](https://geoportal.dane.gov.co/servicios/descarga-y-metadatos/datos-geoestadisticos/?cod=111),
-guárdalo como `data/raw/mgn_2025/MGN2025.zip` (o define `MGN_URL_DIRECTA` en `.env`).
-El SHA-256 queda registrado en la colección `fuentes`.
+## 2. Documentos
 
-`make down` apaga el contenedor. `make shell` abre `mongosh` contra la base.
+| Documento | Finalidad | Mantiene | Consume | Frecuencia | Versión y fecha |
+|---|---|---|---|---|---|
+| [`SRS.md`](SRS.md) | Requisitos funcionales, no funcionales, restricciones de proyecto y de producto, interfaces externas. Fuente de las reglas de negocio | PO | Todo el equipo | Cuando cambia un requisito | Vivo · 2026-11-16 |
+| [`decisiones-del-po.md`](decisiones-del-po.md) | Registro de las decisiones de producto, con fecha, motivo y enlace a la historia | PO | Desarrollo, QA, Arquitectura | El día de cada decisión | 1.0 · 2026-11-17 |
+| [`acta-aceptacion-SCRUM-1470.md`](acta-aceptacion-SCRUM-1470.md) | Acta de aceptación del incremento del Sprint 5 | PO | Sustentación, SM | Al cerrar cada incremento | 1.0 · 2026-11-17 (borrador, sin firma) |
+| [`mapa-de-modulos.md`](mapa-de-modulos.md) | Módulos M-01 a M-13 con épica, dueño y estado al cierre del Sprint 5 | PO | Todo el equipo | Al cerrar cada sprint | 1.0 · 2026-11-17 |
+| [`vision-y-alcance.md`](vision-y-alcance.md) | Problema, MVP y fuera de alcance (resume el SRS §1 y §2) | PO | Todo el equipo, sustentación | Cuando cambia el alcance | Vivo · 2026-11-16 |
+| [`actores-y-ciclo-del-servicio.md`](actores-y-ciclo-del-servicio.md) | Actores y estados del servicio (resume el SRS §2.3) | PO | Desarrollo, QA | Cuando cambia un actor o un estado | Vivo · 2026-11-16 |
+| [`requisitos.md`](requisitos.md) | Índice navegable de RF, RNF y restricciones (resume el SRS §3, §4 y §6) | PO | Desarrollo, QA | Cuando cambia el SRS | Vivo · 2026-11-16 |
+| [`criterios-de-exito.md`](criterios-de-exito.md) | Los tres niveles de «terminado»: historia, incremento y transición | PO con SM | Todo el equipo | Por sprint | Vivo · 2026-11-16 |
+| [`TD.md`](TD.md) | Estrategia de pruebas. El resultado de ejecutarla vive en [07-calidad](../07-calidad/README.md) | Santiago Hernández (QA) | QA, Desarrollo | Por sprint | V2 · 2026-10-21. **Desactualizado:** la V3 del Sprint 5 vive en [`REPORTE_QA_SPRINT5.md`](../07-calidad/REPORTE_QA_SPRINT5.md) |
+| [`reespecificacion-cobertura-US-02.1.4-R1.md`](reespecificacion-cobertura-US-02.1.4-R1.md) | Reespecificación de la cobertura por catálogo jerárquico hasta barrio (SCRUM-1067) | José Nicolás Álvarez | Desarrollo, QA | Cerrado | R1 · 2026-10-26. Implementado en [SCRUM-1385](https://maniservices.atlassian.net/browse/SCRUM-1385) (Finalizada) |
 
-## Estructura del repositorio
+Cada documento enlaza su origen y su destino: **necesidad** (visión) → **requisito** (SRS) → **atributo de calidad** ([`SDD.md`](../02-arquitectura/SDD.md) §7 y §8) → **ADR** ([`adr/`](../02-arquitectura/adr/)) → **componente** (SAD) → **prueba** ([07-calidad](../07-calidad/README.md)). Las decisiones del PO enlazan además su historia en Jira.
 
-```
-src/
-  common/      conexión a Mongo y carga de config.yaml, compartido por todas las fases
-  municipios/  semana 2: límites PDET, un archivo por tarea (ver tabla abajo)
-  edificios/   semana 3: huellas de edificios
-  analisis/    semana 4: asignación y agregación de resultados
-config.yaml    parámetros de cada fase (CRS, fuentes, nombres de colecciones)
-data/          datos crudos y procesados (ignorados por git, salvo las excepciones de abajo)
-docs/          evidencia generada (mapa de control)
-scripts/       utilidades sueltas (chequeo_bson.py)
-Entrega N/     informe en LaTeX y PDF de cada entrega
-notebooks/     EDA
-```
+## 3. Qué decide el PO y qué decide la SM
 
-### `src/municipios/` — quién hace qué
+Según [Roles y decisiones](../04-proceso/roles-y-decisiones.md) y [`GOBIERNO_DEL_EQUIPO.md`](../06-gobernanza/GOBIERNO_DEL_EQUIPO.md) §2.3:
 
-| Archivo | Tarea | Responsable |
+| Decide el **PO** | Decide la **SM** |
+|---|---|
+| Prioridad del backlog y alcance del sprint | Reglas de proceso |
+| Criterios de aceptación de cada historia | Umbrales de los indicadores del equipo (KPI) |
+| Aceptación del incremento (actas) | Declarar un bloqueo relevante |
+| Requisitos y reglas de negocio | Si un desarrollador no alcanza, se escala a la SM, no al PO |
+| Aprobación de la documentación | Facilita y redacta las actas que firma el PO |
+
+Las decisiones de arquitectura son de la **Mesa de Arquitectura** (ADR), y liberar a producción es de **DevOps**.
+
+## 4. Cifras finales del Sprint 5
+
+| Cifra | Valor | Fuente y corte |
 |---|---|---|
-| `descarga.py` | Descargar el MGN 2025 | Jorge |
-| `cruce.py` | Cruzar con MunicipiosPDET.xlsx | Jorge |
-| `verificacion.py` | Verificar los 170 municipios | Jorge |
-| `geometria.py` | Validar/reparar geometrías y reproyectar | Maria Camila |
-| `exportar.py` | Exportar `municipios_pdet.geojson` | Maria Camila |
-| `schema.py` | Colecciones con `$jsonSchema` | Samuel |
-| `carga.py` | Carga con PyMongo (upsert) | Samuel |
-| `indices.py` | Índices `2dsphere` y `subregion_pdet.id` | Samuel |
-| `evidencia.py` | `explain()` y `$geoIntersects` | Samuel |
-| `mapa.py` | Mapa de control | Jose Eduardo |
-| `calidad.py` | Chequeo de tamaño BSON | Jose Eduardo |
+| Historias del Sprint 5 en Done | **84 de 85** | JQL `project = SCRUM AND sprint = "SCRUM Sprint 5" AND issuetype = Historia`, 2026-11-10 ([`VALIDACION_HU-VAL-01.md`](../06-gobernanza/VALIDACION_HU-VAL-01.md), D11) |
+| Ítems del Sprint 5 en Done | **123 de 124** | Misma consulta sin filtrar por tipo |
+| Historia abierta | [SCRUM-1383](https://maniservices.atlassian.net/browse/SCRUM-1383) (HU-M02-15, cifrado de datos sensibles), `Reopened` | Ídem |
 
-`run.py` encadena todo en orden (es lo que corre `make municipios`).
+Las cifras `82/85`, `510 SP` y `532/537` circularon antes del lote `backlog-9nov` y **no se reproducen**: no se usan.
 
-### `src/analisis/` — quién hace qué (semana 4)
+## 5. Discrepancias de HU-VAL-01 que tocan esta carpeta
 
-| Archivo | Tarea | Responsable |
-|---|---|---|
-| `asignacion.py` | Asignar cada edificio a su municipio (`$geoWithin` sobre `centroide`) | Jorge |
-| `evidencia.py` | `explain()`: IXSCAN frente a COLLSCAN | Jorge |
-| `validacion.py` | Validación con GeoPandas en 10 municipios | Jorge |
-| `estilo.py` | Colores por fuente, formato y guardado de figuras | Jose Eduardo |
-| `figuras_eda.py` | Las 4 figuras del EDA rehechas | Jose Eduardo |
-| `agregacion.py` | `$group` + `$merge` a `resultados`, con verificación | Samuel |
-| `sensibilidad.py` | Sensibilidad al umbral de confianza de Google | Samuel |
-| `exportar.py` | CSV por municipio y subregión, tabla por subregión | Samuel |
-| `mapas.py` | Mapas por fuente, de diferencia (D) y de % de techos | Maria Camila |
-| `ranking.py` | Top 15 por área conservadora `min(A_G, A_M)` | Maria Camila |
-| `run.py` | Encadena todo en orden (es lo que corre `make analisis`) | Maria Camila |
-
-Las tablas y figuras de la semana 4 quedan en `Entrega 4/` y `Entrega 4/img/`.
-
-Datos versionados a propósito (el resto de `data/` está en `.gitignore`):
-`data/raw/MunicipiosPDET.xlsx` (insumo pequeño y estable) y
-`data/processed/municipios_pdet.geojson` (salida final, ~37 MB), para que nadie
-tenga que volver a descargar el MGN solo para probar su parte. En la semana 4 se
-suman `resultados_municipio.csv`, `resultados_subregion.csv` y
-`ranking_municipios.csv`, para rehacer mapas y ranking sin la base.
-
-## Flujo de trabajo del equipo
-
-- Una rama y un pull request por persona y por tarea. Cada PR lo aprueba
-  alguien de otro frente antes de hacer merge a `main`.
-- Commits distribuidos durante la semana, no todo de último momento.
-- Cualquier integrante puede salir a sustentar: todos deben poder explicar el
-  flujo completo, no solo su parte.
+| Fila | Tema | Estado | Dónde quedó |
+|---|---|---|---|
+| D2 / P-D2 | Pagar después de finalizar | Decidido por el PO | [Decisiones del PO](decisiones-del-po.md#pagos) |
+| D11 | Cifras del Sprint 5 | Verificado: 84/85 | [§4](#4-cifras-finales-del-sprint-5) |
+| D13 | HU-M04-05 sin historia en Jira | Decidido: se retira del plan | [Decisiones del PO](decisiones-del-po.md#catálogo) |
+| D14 / P-D14 | Jardinería activa en PROD | Decidido por el PO | [Decisiones del PO](decisiones-del-po.md#catálogo) |
+| P-D15b | Cifrado de datos personales | **Abierto: faltan un RNF y un QAS de confidencialidad en reposo**, que son del PO | Pendiente en [`SRS.md`](SRS.md) §6.1 |

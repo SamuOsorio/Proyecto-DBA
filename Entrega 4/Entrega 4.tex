@@ -225,6 +225,14 @@ Microsoft usando el índice \campo{centroide\_2dsphere}; sin él, una sola
 consulta \campo{\$geoWithin} recorre la colección completa y tarda unas 10
 veces más (sección~\ref{sec:explain4}).
 
+\textbf{Análisis exploratorio.}\label{sec:eda} El EDA de la Entrega~3 mostró
+que las dos fuentes cubren casi la misma superficie, que Google reparte esa
+superficie en huellas más pequeñas y que cinco municipios del Chocó y del
+Atrato antioqueño no tienen ningún edificio en Google (mapa de control de la
+Entrega~3). Las cuatro figuras del EDA se rehicieron con
+\campo{figuras\_eda.py} y el estilo común \campo{estilo.py}; la comparación
+antes y después está en la sección de correcciones de la Entrega~3.
+
 % =====================================================================
 % 4. Asignación por centroide y validación (Jorge)
 % =====================================================================
@@ -233,21 +241,21 @@ veces más (sección~\ref{sec:explain4}).
 \label{sec:explain4}
 
 % =====================================================================
-% 5. Correcciones al EDA (Jose Eduardo)
-% =====================================================================
-\InputIfFileExists{seccion_eda.tex}{}{%
-  \section{Correcciones al EDA}\label{sec:eda4}\pendiente{sección de Jose Eduardo (seccion\_eda.tex): antes y después de las 4 figuras, dispersión y gráfica de sensibilidad}}
-
-% =====================================================================
 % 6. Agregación y sensibilidad (Samuel)
 % =====================================================================
 \InputIfFileExists{seccion_agregacion.tex}{}{%
   \section{Agregación y sensibilidad}\pendiente{sección de Samuel (seccion\_agregacion.tex)}}
 
 % =====================================================================
-% 7. Resultados: mapas (Maria Camila)
+% 7. Lectura de los resultados (Jose Eduardo)
 % =====================================================================
-\section{Resultados por municipio}
+\InputIfFileExists{seccion_resultados.tex}{}{%
+  \section{Lectura de los resultados}\pendiente{sección de Jose Eduardo (seccion\_resultados.tex)}}
+
+% =====================================================================
+% 8. Mapas de resultados (Maria Camila)
+% =====================================================================
+\section{Mapas de resultados por municipio}
 \label{sec:resultados}
 
 Esta sección cubre \campo{mapas.py}, en \campo{src/analisis/}. Los mapas no
@@ -290,7 +298,8 @@ extensos de la Amazonía y la Orinoquía, aunque ocupan buena parte del mapa,
 tienen poca área de techos. La diferencia visible está en el Chocó y la costa
 pacífica nariñense, que son más claros en Google. La correlación entre las dos
 fuentes por municipio es alta (Pearson 0,99; Spearman 0,94 sobre los 170
-municipios).
+municipios), como también muestra la dispersión de la
+figura~\ref{fig:res-dispersion}.
 
 \subsection{Diferencia entre fuentes}
 
@@ -335,7 +344,7 @@ y el norte del Cauca aparece como la zona más densa.
 \end{figure}
 
 % =====================================================================
-% 8. Ranking (Maria Camila)
+% 9. Ranking (Maria Camila)
 % =====================================================================
 \section{Ranking de municipios candidatos}
 \label{sec:ranking}
@@ -395,7 +404,7 @@ por su área baja: ahí el resultado depende de la fuente más que del municipio
 y requieren verificación con imágenes o en campo antes de decidir.
 
 % =====================================================================
-% 9. Reproducción (Maria Camila)
+% 10. Reproducción (Maria Camila)
 % =====================================================================
 \section{Reproducción paso a paso y entorno}
 \label{sec:reproduccion}
@@ -421,6 +430,7 @@ final imprime cuánto tardó cada paso.
     \campo{sensibilidad} & Samuel & Tabla de sensibilidad al umbral de Google \\
     \campo{exportar} & Samuel & CSV por municipio y subregión; tabla por subregión \\
     \campo{figuras\_eda} & Jose Eduardo & Las cuatro figuras del EDA rehechas \\
+    \campo{graficas} & Jose Eduardo & Dispersión por municipio y gráfica de sensibilidad \\
     \campo{mapas} & Maria Camila & Mapas por fuente, de diferencia y de \% de techos \\
     \campo{ranking} & Maria Camila & Top 15, tabla y gráfica; ranking completo en CSV \\
     \bottomrule
@@ -449,7 +459,7 @@ versiones fijadas en \campo{requirements.txt}.
 resumen de tiempos por paso.}{fig:make-all}
 
 % =====================================================================
-% 10. Conclusiones (todos)
+% 11. Conclusiones (todos)
 % =====================================================================
 \section{Conclusiones, limitaciones y próximos pasos}
 \label{sec:conclusiones}

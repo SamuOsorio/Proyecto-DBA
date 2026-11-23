@@ -19,7 +19,7 @@ uno falla el flujo se detiene ahí. Al final imprime cuánto tardó cada paso.
 Uso:
   python -m src.analisis.run                     # todo
   python -m src.analisis.run --desde agregacion  # retoma desde un paso
-  python -m src.analisis.run --solo-figuras      # mapas y ranking, sin la base
+  python -m src.analisis.run --solo-figuras      # gráficas, mapas y ranking, sin la base
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from src.common.config import ROOT
 PASOS = ["asignacion", "evidencia", "validacion", "agregacion", "sensibilidad",
          "exportar", "figuras_eda", "graficas", "mapas", "ranking"]
 OPCIONALES = {"graficas"}           # se salta si el archivo todavía no existe
-SIN_BASE = ["mapas", "ranking"]     # leen los CSV y el GeoJSON versionados
+SIN_BASE = ["graficas", "mapas", "ranking"]  # leen los CSV y el GeoJSON versionados
 
 
 def correr(pasos: list[str]) -> list[tuple[str, float, str]]:
@@ -68,7 +68,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Flujo completo de la semana 4")
     ap.add_argument("--desde", choices=PASOS, help="retoma desde este paso")
     ap.add_argument("--solo-figuras", action="store_true",
-                    help="solo mapas y ranking (no necesita MongoDB)")
+                    help="solo gráficas, mapas y ranking (no necesita MongoDB)")
     a = ap.parse_args()
     if a.solo_figuras:
         pasos = SIN_BASE

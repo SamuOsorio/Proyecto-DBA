@@ -23,11 +23,11 @@ modelo de datos.
 | 2 | Límites PDET: 170 municipios cargados e indexados | Hecha (Entrega 2) |
 | 3 | Huellas de edificios (Google y Microsoft): 2.694.786 y 1.761.048 edificios cargados e indexados, EDA en `notebooks/eda_edificios.ipynb` | Hecha (Entrega 3) |
 | 4 | Asignación por centroide, `resultados` (170 documentos por fuente y umbral), sensibilidad, mapas y ranking | Hecha (Entrega 4) |
-| Final | Informe técnico autocontenido para la UPME | 26 de noviembre |
+| Final | Informe técnico autocontenido para la UPME: [`Informe Final/Informe Final.pdf`](<Informe Final/Informe Final.pdf>) | Hecha |
 
 ## Cómo correr el proyecto
 
-Requisitos: Docker + Docker Compose, Python 3.12.
+Requisitos: Docker + Docker Compose, Python 3.12 o superior.
 
 ```bash
 cp .env.example .env            # ajustar usuario/contraseña si hace falta
@@ -38,7 +38,7 @@ make up                         # levanta MongoDB 8 en Docker
 make schema                     # crea las colecciones con $jsonSchema (semana 1)
 make municipios                 # descarga, valida y carga los municipios PDET (semana 2)
 make edificios                  # descarga, limpia, carga e indexa edificios de Google y Microsoft (semana 3)
-make analisis                   # asigna, agrega, exporta y genera tablas, mapas y ranking (semana 4)
+make analisis                   # asigna, agrega, exporta y genera tablas, mapas, ranking y potencial (semana 4)
 ```
 
 `make all` corre todo lo anterior seguido, desde una base vacía. Para retomar el

@@ -1,0 +1,103 @@
+% =====================================================================
+% 9. Discusión y recomendaciones
+% =====================================================================
+\section{Discusión y recomendaciones}
+\label{sec:discusion}
+
+\subsection{Por qué difieren las fuentes}
+
+Los datos muestran tres causas:
+
+\begin{itemize}
+  \item \textbf{Tamaño de las huellas.} Google tiene 1,53 veces más edificios
+        pero casi la misma área total, porque divide la misma superficie en
+        huellas más pequeñas (82\,m\textsuperscript{2} de media frente a
+        126\,m\textsuperscript{2}). Cada modelo recorta de forma distinta los
+        techos contiguos. Por eso el \emph{conteo} de edificios no sirve para
+        comparar fuentes, y el ranking y la estimación de potencial usan
+        \emph{área}.
+  \item \textbf{Huecos de detección en el Pacífico.} En el Chocó y la costa
+        nariñense Google detecta muy poco o nada. Una causa probable es la
+        nubosidad casi permanente de la región, que reduce las imágenes
+        útiles para el modelo. Ahí se concentran 18 de los 23 municipios con
+        desacuerdo fuerte.
+  \item \textbf{Fechas e imágenes distintas.} Microsoft usa imágenes de 2014
+        a 2021 y Google una inferencia de 2023; una cabecera que creció en
+        esos años tiene más área en la fuente más reciente.
+\end{itemize}
+
+La consecuencia práctica es que el total regional es robusto (las fuentes
+difieren menos del 0,5\,\% y el umbral lo mueve como mucho un 19\,\%), pero la
+cifra de un municipio concreto depende de la fuente, sobre todo en el
+Pacífico. Por eso se reporta el área conservadora y, donde las fuentes no
+coinciden, conviene reportar un rango y no una sola cifra.
+
+\subsection{Recomendaciones para la UPME}
+\label{sec:recomendaciones}
+
+\textbf{Selección de pilotos.}
+\begin{enumerate}
+  \item Partir del top 15 por área conservadora (tabla~\ref{tab:ranking}):
+        concentra el 39\,\% del área de techos de los 170 municipios y ninguno
+        tiene las fuentes en desacuerdo.
+  \item Dentro del top 15, empezar por los municipios con mayor porcentaje de
+        techos, donde el área está concentrada en un casco urbano y no
+        dispersa en veredas, lo que facilita la conexión y la operación:
+        \textbf{Santa Marta}, \textbf{Santander de Quilichao} y
+        \textbf{Apartadó} están en el top 15 y entre los cuatro con mayor
+        porcentaje de techos.
+  \item Buscar diversidad territorial: el top 15 cubre 11 de las 16
+        subregiones, así que un conjunto pequeño de pilotos puede
+        representar regiones distintas.
+\end{enumerate}
+
+\textbf{Municipios del Pacífico.} No descartarlos por su área baja: en los 23
+municipios con desacuerdo fuerte el resultado depende más de la fuente que del
+municipio. Se recomienda verificarlos antes de decidir, con imágenes
+satelitales recientes o de alta resolución, con una tercera fuente (por
+ejemplo GlobalBuildingAtlas, que además trae alturas) o en campo, empezando
+por los cinco municipios sin edificios en Google.
+
+\textbf{Refinar la estimación antes de dimensionar.}
+\begin{enumerate}
+  \item Cruzar el área con la irradiación por municipio del Atlas de
+        Radiación Solar~\cite{atlas} en lugar del promedio nacional.
+  \item Estimar el área útil por techo (sombras, orientación, inclinación,
+        material) con imágenes o modelos de elevación en los municipios
+        candidatos; el factor de aprovechamiento de 0,40 es un supuesto.
+  \item Cruzar con la demanda eléctrica y la red de cada municipio, para
+        dimensionar según el consumo y la capacidad de conexión, y no solo
+        según el techo disponible.
+\end{enumerate}
+
+\textbf{Continuidad de la plataforma de datos.}
+\begin{itemize}
+  \item Las fuentes se actualizan: el flujo permite recargar una versión
+        nueva de cualquiera de ellas con \campo{make edificios} y recalcular
+        todo con \campo{make analisis}, conservando la trazabilidad en
+        \campo{fuentes} y \campo{bitacora\_cargas}.
+  \item Para extender el análisis a todo el país (unos 16,5 millones de
+        edificios solo en Google), el diseño no cambia: la asignación ya
+        corre municipio por municipio con índice, y MongoDB permite repartir
+        las colecciones de edificios con \emph{sharding} por
+        \campo{cod\_mpio}.
+\end{itemize}
+
+\subsection{Limitaciones}
+\label{sec:limitaciones}
+
+\begin{itemize}
+  \item El área es la huella en planta: es un límite superior del área útil
+        para paneles.
+  \item Las huellas vienen de modelos de aprendizaje automático sobre
+        imágenes de fechas distintas; no son un catastro y tienen errores de
+        omisión y de partición de techos.
+  \item La estimación de potencia usa una irradiación nacional y un factor de
+        aprovechamiento fijo.
+  \item Un centroide justo sobre un límite puede quedar fuera por la
+        diferencia entre aristas esféricas y planas (un edificio de 4,5
+        millones en este proyecto).
+  \item La validación independiente cubre una muestra de 10 municipios, no
+        los 170, y el proyecto no tiene pruebas automáticas; la verificación
+        se apoya en controles de conteo en cada etapa.
+\end{itemize}

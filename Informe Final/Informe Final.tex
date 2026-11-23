@@ -1,0 +1,167 @@
+% =====================================================================
+% DBA - Proyecto final - Informe técnico final
+% Potencial solar en techos de los municipios PDET
+% Integra las entregas 1 a 4 en un documento autocontenido para la UPME.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}{}
+\usepackage[spanish,es-noshorthands,es-tabla]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,array}
+\usepackage{enumitem}
+\usepackage[dvipsnames,table]{xcolor}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{calc,positioning,arrows.meta}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+
+% --- Colores --------------------------------------------------------
+\definecolor{acento}{HTML}{2F6FDB}
+\definecolor{gris}{HTML}{6B6B6B}
+\hypersetup{colorlinks=true, linkcolor=acento, urlcolor=acento, citecolor=acento}
+
+% --- Tablas ---------------------------------------------------------
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.25}
+
+% --- Listas ---------------------------------------------------------
+\setlist{itemsep=2pt, topsep=4pt}
+
+% Más holgura entre palabras antes que salirse del margen con nombres en \texttt
+\setlength{\emergencystretch}{3em}
+
+% --- Código ---------------------------------------------------------
+\lstdefinestyle{codigo}{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{gray!50},
+  backgroundcolor=\color{gray!6},
+  xleftmargin=4pt, xrightmargin=4pt,
+  showstringspaces=false,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+           {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+           {ñ}{{\~n}}1 {Ñ}{{\~N}}1
+}
+\lstset{style=codigo}
+
+% --- Atajos ---------------------------------------------------------
+\newcommand{\campo}[1]{\texttt{#1}}
+\newcommand{\ruta}[1]{\begingroup\urlstyle{tt}\url{#1}\endgroup}
+
+% Figura de una captura o gráfica de img/.
+%   \fig[ancho]{archivo}{alto relativo}{pie}{etiqueta}
+\newcommand{\fig}[5][\textwidth]{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=#1,height=#3\textheight,keepaspectratio]{img/#2}
+    \caption{#4}
+    \label{#5}
+  \end{figure}}
+
+% Las tablas generadas por el código (tablas/*.tex) vienen de la carpeta de la
+% Entrega 4 y de src/analisis/potencial.py.
+\newcommand{\tabla}[1]{\input{tablas/#1.tex}}
+
+\begin{document}
+
+% ------------------------------- Portada -----------------------------
+\begin{titlepage}
+  \centering
+  {\large Pontificia Universidad Javeriana\par}
+  {\large Departamento de Ingeniería de Sistemas\par}
+  \vspace{0.8cm}
+  {\large Administración de Bases de Datos (DBA) -- 2026-30\par}
+  \vspace{2.2cm}
+  {\Huge\bfseries Informe técnico final\par}
+  \vspace{1cm}
+  {\LARGE Potencial solar en techos\\ de los municipios PDET\par}
+  \vspace{0.8cm}
+  {\large Conteo de edificaciones y área de techos por municipio\\
+  con MongoDB y dos fuentes abiertas de huellas de edificios\par}
+  \vspace{0.6cm}
+  {\large Preparado para la Oficina de Investigación e Información de la UPME\par}
+  \vspace{2.2cm}
+  {\large
+    Maria Camila Beltran \\
+    \vspace{0.5cm}
+    Jorge Fortich \\
+    \vspace{0.5cm}
+    Jose Eduardo Valeriano \\
+    \vspace{0.5cm}
+    Samuel Osorio Rodríguez\par}
+  \vspace{2.2cm}
+  {\large Profesor: Andrés Oswaldo Calderón Romero, Ph.D.\par}
+  \vspace{1.5cm}
+  {\large Noviembre de 2026\par}
+\end{titlepage}
+
+\input{capitulos/00_resumen}
+
+\tableofcontents
+\newpage
+
+\input{capitulos/01_introduccion}
+\input{capitulos/02_arquitectura}
+\input{capitulos/03_modelo}
+\input{capitulos/04_municipios}
+\input{capitulos/05_edificios}
+\input{capitulos/06_eda}
+\input{capitulos/07_metodologia}
+\input{capitulos/08_resultados}
+\input{capitulos/09_discusion}
+\input{capitulos/10_reproduccion}
+\input{capitulos/11_conclusiones}
+
+% ------------------------------- Referencias -------------------------
+\begin{thebibliography}{9}
+
+\bibitem{enunciado}
+A.~O. Calderón Romero, \emph{Database Administration -- Final Project},
+Pontificia Universidad Javeriana, 2026.
+
+\bibitem{pdet}
+Agencia de Renovación del Territorio, \emph{¿Qué son los PDET?} y listado
+\texttt{MunicipiosPDET.xlsx}.
+\url{https://www.renovacionterritorio.gov.co/central-pdet/que-son-los-pdet}
+
+\bibitem{mgn}
+DANE, \emph{Marco Geoestadístico Nacional -- Descarga de datos
+geoestadísticos}, versión MGN2025.
+\url{https://geoportal.dane.gov.co/servicios/descarga-y-metadatos/datos-geoestadisticos/?cod=111}
+
+\bibitem{google}
+W.~Sirko et al., \emph{Open Buildings V3}, Google Research.
+\url{https://sites.research.google/gr/open-buildings/}
+
+\bibitem{microsoft}
+Microsoft, \emph{Global ML Building Footprints}.
+\url{https://github.com/microsoft/GlobalMLBuildingFootprints};
+\url{https://planetarycomputer.microsoft.com/dataset/ms-buildings}
+
+\bibitem{mongodb}
+MongoDB, Inc., \emph{Geospatial Queries} y \emph{2dsphere Indexes},
+documentación de MongoDB 8.
+\url{https://www.mongodb.com/docs/manual/geospatial-queries/}
+
+\bibitem{atlas}
+UPME e IDEAM, \emph{Atlas de Radiación Solar, Ultravioleta y Ozono de
+Colombia}.
+\url{http://atlas.ideam.gov.co/visorAtlasRadiacion.html}
+
+\end{thebibliography}
+
+\appendix
+\input{capitulos/anexo_evidencias}
+
+\end{document}

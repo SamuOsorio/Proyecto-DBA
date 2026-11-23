@@ -24,6 +24,8 @@ data/processed/*
 !data/processed/.gitkeep
 !data/processed/resultados_municipio.csv
 !data/processed/resultados_subregion.csv
+!data/processed/ranking_municipios.csv
+!data/processed/potencial_municipios.csv
 __pycache__/
 *.pyc
 .venv/

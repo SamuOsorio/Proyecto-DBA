@@ -1,0 +1,129 @@
+% =====================================================================
+% 4. Límites PDET (semana 2)
+% =====================================================================
+\section{Límites de los municipios PDET}
+\label{sec:municipios}
+
+\campo{make municipios} (\campo{src/municipios/run.py}) descarga el MGN 2025,
+lo cruza con el listado PDET, valida y reproyecta las geometrías, y las carga
+e indexa en MongoDB.
+
+\subsection{Adquisición y verificación}
+\label{sec:mgn-descarga}
+
+\textbf{Descarga.} El geoportal del DANE genera la descarga desde una página
+web, sin un enlace directo y estable, así que \campo{descarga.py} acepta el
+ZIP puesto a mano en \ruta{data/raw/mgn_2025/} o una URL directa opcional
+(\campo{MGN\_URL\_DIRECTA} en \campo{.env}). Se usó
+\campo{MGN2025\_MPIO\_GRAFICO.zip} (nivel municipio, Shapefile). El script
+calcula el SHA-256 del ZIP, lo descomprime y registra la fuente en
+\campo{fuentes} (\campo{\_id="mgn"}) con URL, versión, CRS leído del
+\campo{.prj}, fecha y checksum:
+
+\begin{lstlisting}
+SHA-256: a3c01393059be8f2947de5e0a828faa4c7a43119819a667a8124854340bc141f
+\end{lstlisting}
+
+La misma suma se obtuvo en la corrida desde base vacía de este informe
+(sección~\ref{sec:reproduccion}), lo que confirma que el insumo no cambió.
+
+\textbf{Cruce con el listado PDET.} \campo{cruce.py} lee
+\campo{MunicipiosPDET.xlsx} y la capa municipal del MGN y cruza por código
+DANE. Los códigos del Excel vienen como números y los de Antioquia pierden el
+cero inicial (5045 en vez de 05045), así que se rellenan a cinco dígitos antes
+del cruce. \campo{verificacion.py} es un control independiente: vuelve a
+contar desde el Excel y la capa cruzada.
+
+\begin{table}[H]
+  \centering\small
+  \caption{Control de cobertura del cruce (\campo{verificacion.py}).}
+  \label{tab:verificacion}
+  \begin{tabularx}{0.85\textwidth}{L r r c}
+    \toprule
+    Verificación & Esperado & Obtenido & OK \\
+    \midrule
+    Municipios en el Excel (códigos únicos) & 170 & 170 & \checkmark \\
+    Códigos repetidos en el Excel           & 0   & 0   & \checkmark \\
+    Municipios que cruzaron con el MGN      & 170 & 170 & \checkmark \\
+    Subregiones PDET en el resultado        & 16  & 16  & \checkmark \\
+    Departamentos en el resultado           & 19  & 19  & \checkmark \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Integridad y formato de las geometrías}
+\label{sec:mgn-geometria}
+
+MongoDB rechaza un polígono inválido al insertarlo en una colección con
+índice \campo{2dsphere}, así que la validez se revisa antes de cargar.
+\campo{geometria.py}:
+
+\begin{itemize}
+  \item Revisa \campo{is\_valid} (GEOS, vía Shapely) y guarda el motivo de
+        las inválidas; las repara con \campo{make\_valid} conservando solo las
+        partes poligonales, para que el resultado sea siempre
+        \campo{Polygon} o \campo{MultiPolygon}.
+  \item Calcula \campo{area\_km2} en EPSG:9377 y reproyecta a EPSG:4326 con
+        orden \campo{[lon, lat]}.
+  \item Ajusta las coordenadas a una rejilla de $10^{-6}$ grados (unos
+        10\,cm), elimina vértices repetidos y orienta los anillos según
+        RFC~7946.
+  \item Controla que todas las coordenadas caigan en el rectángulo de
+        Colombia (detecta lon/lat invertidas) y vuelve a revisar la validez
+        después de reproyectar.
+\end{itemize}
+
+Las 170 geometrías llegaron válidas y ninguna necesitó reparación. Como
+verificación independiente, el área calculada se comparó con el área oficial
+del MGN (\campo{mpio\_narea}): la diferencia máxima fue de
+$2{,}2\times10^{-5}$\,\% y el total coincide (389\,182\,km\textsuperscript{2}).
+
+\begin{table}[H]
+  \centering\small
+  \caption{Resultados de la validación y exportación de los municipios.}
+  \label{tab:geometria}
+  \begin{tabularx}{0.85\textwidth}{L r}
+    \toprule
+    Indicador & Valor \\
+    \midrule
+    Municipios procesados / válidos de origen / reparados & 170 / 170 / 0 \\
+    Área total de los municipios PDET  & 389\,182\,km\textsuperscript{2} \\
+    Municipio más grande / más pequeño & Solano, 42\,234\,km\textsuperscript{2} / Chalán, 84\,km\textsuperscript{2} \\
+    Vértices en total (máximo: Solano) & 1\,551\,994 (51\,568) \\
+    Documento más pesado (Solano)      & 1,74\,MB (10,9\,\% del límite de 16\,MB) \\
+    Tamaño de \campo{municipios\_pdet.geojson} & 37,1\,MB \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\campo{exportar.py} escribe \ruta{data/processed/municipios_pdet.geojson} con
+un \campo{Feature} por municipio y los campos del diccionario en
+\campo{properties}; valida que no haya códigos repetidos y que todos tengan
+cinco dígitos. Este archivo se versiona, para que nadie dependa de volver a
+descargar el MGN. \campo{calidad.py} mide el tamaño BSON exacto de cada
+documento con \campo{bson.encode()} y falla si alguno supera el límite; el
+mayor ocupa el 10,9\,\% del límite, así que ninguno tuvo que simplificarse.
+
+\subsection{Carga, índices y evidencia}
+\label{sec:mgn-carga}
+
+\campo{schema.py} crea \campo{municipios} y \campo{fuentes} con su validador.
+\campo{carga.py} usa \campo{bulk\_write} con un \campo{UpdateOne(...,
+upsert=True)} por municipio, así que volver a correrlo no duplica documentos;
+al terminar completa \campo{fuentes.mgn.n\_registros} y registra la ejecución
+en \campo{bitacora\_cargas}. \campo{indices.py} crea el \campo{2dsphere} sobre
+\campo{geometry} y el índice de \campo{subregion\_pdet.id}.
+
+\campo{evidencia.py} prueba que el índice se \emph{usa}: toma un punto interior
+de un municipio (Amalfi), corre \campo{\$geoIntersects} y exige que el plan de
+\campo{explain()} tenga \campo{IXSCAN} y no \campo{COLLSCAN}, y que la consulta
+devuelva exactamente ese municipio.
+
+\begin{lstlisting}
+[evidencia] etapas del plan: ['FETCH', 'IXSCAN'] (se espera IXSCAN, no COLLSCAN)
+[evidencia] punto de control: AMALFI (05031) en [-74.95147, 7.02048]
+[evidencia] $geoIntersects devolvió: [{'_id': '05031', 'nombre': 'AMALFI'}]
+\end{lstlisting}
+
+\fig[0.8\textwidth]{cap_mapa.png}{0.4}{Mapa de control: los 170 municipios PDET
+coloreados por sus 16 subregiones, sin huecos ni geometrías sueltas.}{fig:mapa-control}

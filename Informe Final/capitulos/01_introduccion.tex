@@ -1,0 +1,71 @@
+% =====================================================================
+% 1. Introducción
+% =====================================================================
+\section{Introducción}
+\label{sec:intro}
+
+\subsection{Contexto y objetivo}
+
+La UPME evalúa la factibilidad de granjas solares en distintas regiones del
+país y quiere priorizar los municipios designados como PDET (Programas de
+Desarrollo con Enfoque Territorial), un foco de la política de desarrollo
+posconflicto~\cite{pdet}. A mayor área de techos en un municipio, mayor
+potencial para captar energía con paneles instalados sobre ellos. El
+enunciado del proyecto~\cite{enunciado} pide una metodología reproducible
+para \textbf{contar las edificaciones y sumar el área de sus techos en cada
+municipio PDET}, comparando al menos dos fuentes abiertas de huellas de
+edificios y usando una solución NoSQL.
+
+El listado oficial (\campo{MunicipiosPDET.xlsx}) tiene 170 municipios en 16
+subregiones PDET y 19 departamentos. Los límites municipales salen del Marco
+Geoestadístico Nacional (MGN) del DANE~\cite{mgn}.
+
+\subsection{Alcance}
+
+\begin{itemize}
+  \item \textbf{Territorio:} los 170 municipios PDET, con sus límites del MGN
+        2025 (389\,182\,km\textsuperscript{2}).
+  \item \textbf{Fuentes de edificios:} Google Open Buildings v3~\cite{google}
+        y Microsoft Building Footprints~\cite{microsoft}, dos de las tres que
+        propone el enunciado (la tercera es GlobalBuildingAtlas). La
+        justificación está en la tabla~\ref{tab:decisiones}.
+  \item \textbf{Métricas por municipio y fuente:} número de edificios, área
+        total de techos, área media, densidad (edificios por
+        km\textsuperscript{2}) y porcentaje del municipio cubierto por techos,
+        con un análisis de sensibilidad al umbral de confianza de Google.
+  \item \textbf{Fuera de alcance:} el diseño de los pilotos, la irradiación
+        por municipio y la demanda eléctrica. La sección~\ref{sec:potencial}
+        da solo un orden de magnitud de la potencia instalable.
+\end{itemize}
+
+El área de techo de cada edificio se aproxima con el área de su huella en
+planta, que es lo que entregan las dos fuentes. Para cada municipio $m$ y
+fuente $f$:
+
+\begin{equation}
+  A_{m,f} = \sum_{e \in E_f,\; \mathrm{centroide}(e) \in m} \mathrm{area}_{9377}(e)
+  \label{eq:area}
+\end{equation}
+
+donde $E_f$ es el conjunto de edificios de la fuente $f$ y
+$\mathrm{area}_{9377}(e)$ es el área de la huella calculada en la proyección
+plana oficial de Colombia (EPSG:9377, en metros).
+
+\subsection{Cómo se construyó y cómo leer este informe}
+
+El proyecto se desarrolló en cuatro entregas semanales, cada una con su
+código en el repositorio y su informe: diseño del esquema (semana 1), límites
+PDET (semana 2), huellas de edificios (semana 3) y análisis (semana 4). Este
+informe las integra en un solo documento:
+
+\begin{itemize}
+  \item Secciones~\ref{sec:arquitectura} y~\ref{sec:modelo}: arquitectura,
+        decisiones tecnológicas y modelo de datos.
+  \item Secciones~\ref{sec:municipios} a~\ref{sec:eda}: adquisición,
+        integridad y carga de los datos, y su análisis exploratorio.
+  \item Sección~\ref{sec:metodologia}: cómo se calcularon las métricas.
+  \item Secciones~\ref{sec:resultados} y~\ref{sec:discusion}: resultados,
+        discusión y recomendaciones.
+  \item Sección~\ref{sec:reproduccion}: cómo reproducir todo.
+  \item Anexo~\ref{sec:anexo}: capturas de evidencia de cada etapa.
+\end{itemize}

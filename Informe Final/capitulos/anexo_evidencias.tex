@@ -1,0 +1,72 @@
+% =====================================================================
+% Anexo: evidencias de ejecución
+% =====================================================================
+\section{Evidencias de ejecución}
+\label{sec:anexo}
+
+Capturas de las ejecuciones reales contra MongoDB, tomadas durante el
+proyecto, en el orden del flujo. Los informes de cada entrega
+(\ruta{Entrega 1/} a \ruta{Entrega 4/} en el repositorio) tienen el detalle de
+cada paso.
+
+\subsection{Límites PDET}
+
+\fig{cap_cruce.png}{0.25}{\campo{cruce.py}: localiza la capa municipal del MGN
+y cruzan los 170 municipios PDET.}{fig:a-cruce}
+\fig{cap_geometria.png}{0.3}{\campo{geometria.py} y \campo{exportar.py}: 170
+municipios revisados, ninguno inválido, y el GeoJSON exportado.}{fig:a-geometria}
+\fig{cap_schema.png}{0.2}{\campo{schema.py}: crea \campo{municipios} y
+\campo{fuentes}; al volver a correrlo no modifica las existentes.}{fig:a-schema}
+\fig{cap_validacion.png}{0.25}{Un documento sin los campos obligatorios es
+rechazado por el validador \campo{\$jsonSchema} (error 121).}{fig:a-validacion}
+\fig{cap_carga.png}{0.2}{\campo{carga.py}: los 170 municipios en la colección.}{fig:a-carga}
+\fig{cap_indices.png}{0.2}{\campo{indices.py}: \campo{geometry\_2dsphere} y
+\campo{subregion\_pdet.id\_1}.}{fig:a-indices}
+\fig{cap_evidencia.png}{0.25}{\campo{evidencia.py}: el plan usa \campo{IXSCAN} y
+\campo{\$geoIntersects} devuelve el municipio correcto.}{fig:a-evidencia}
+
+\subsection{Google Open Buildings}
+
+\fig{cap_google_listar.png}{0.25}{Celdas S2 que tocan Colombia y su tamaño
+(\texttt{--listar}).}{fig:a-g-listar}
+\fig{cap_google_descarga.png}{0.25}{Descarga o reutilización de las celdas y
+SHA-256 de la fuente.}{fig:a-g-descarga}
+\fig{cap_google_fuentes.png}{0.3}{Documento de Google en \campo{fuentes}.}{fig:a-g-fuentes}
+\fig{cap_run_google.png}{0.25}{Tabla de control de Google en \campo{make
+edificios}.}{fig:a-g-run}
+
+\subsection{Microsoft Building Footprints}
+
+\fig{cap_ms_indice.png}{0.2}{Índice de Microsoft: 232 particiones de
+Colombia.}{fig:a-ms-indice}
+\fig{cap_ms_descarga.png}{0.2}{Descarga: 125 de 232 particiones tocan PDET y
+SHA-256 global.}{fig:a-ms-descarga}
+\fig{cap_ms_manifest.png}{0.22}{\campo{manifest.csv}: tamaño y SHA-256 de cada
+archivo.}{fig:a-ms-manifest}
+\fig{cap_ms_parquet.png}{0.25}{Verificación del Parquet de Microsoft con
+DuckDB.}{fig:a-ms-parquet}
+\fig{cap_ms_geoparquet.png}{0.25}{Lectura de los Parquet de Microsoft y de
+Google con GeoPandas.}{fig:a-ms-geoparquet}
+\fig{cap_ms_fuentes.png}{0.2}{Documento de Microsoft en \campo{fuentes}.}{fig:a-ms-fuentes}
+\fig{cap_ms_bitacora.png}{0.35}{Entradas de \campo{bitacora\_cargas} de
+Microsoft.}{fig:a-ms-bitacora}
+\fig{cap_run_microsoft.png}{0.18}{Tabla de control de Microsoft en \campo{make
+edificios}.}{fig:a-ms-run}
+
+\subsection{Carga e índices de edificios}
+
+\fig{cap_schema_edificios.png}{0.3}{\campo{schema.py}: colecciones de edificios
+con validación \campo{\$jsonSchema}.}{fig:a-schema-edif}
+\fig{cap_validacion_edificios.png}{0.3}{Un edificio sin campos obligatorios es
+rechazado (error 121).}{fig:a-validacion-edif}
+\fig{cap_carga_edificios.png}{0.35}{\campo{carga.py} para las dos fuentes.}{fig:a-carga-edif}
+\fig{cap_indices_edificios.png}{0.3}{\campo{indices.py} con el tiempo de cada
+índice.}{fig:a-indices-edif}
+\fig{cap_evidencia_edificios.png}{0.35}{\campo{evidencia.py}: planes con
+\campo{IXSCAN} y tamaños de las colecciones.}{fig:a-evidencia-edif}
+\fig{cap_run_edificios.png}{0.3}{Final de \campo{make edificios}: carga, índices y
+evidencia.}{fig:a-run-edif}
+
+\subsection{Análisis}
+
+\fig{cap_asignacion.png}{0.35}{Salida de la asignación por centroide.}{fig:a-asignacion}

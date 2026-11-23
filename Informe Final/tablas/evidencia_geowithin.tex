@@ -1,0 +1,15 @@
+\begin{table}[H]
+\centering\small
+\caption{\texttt{explain("executionStats")} de \texttt{\$geoWithin} sobre \texttt{centroide}: con el índice y forzando \texttt{COLLSCAN}.}
+\label{tab:explain-geowithin}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+\textbf{Fuente} & \textbf{Plan} & \textbf{Devueltos} & \textbf{Claves} & \textbf{Docs examinados} & \textbf{ms} \\
+\midrule
+Google & IXSCAN & 15\,303 & 25\,103 & 25\,071 & 730 \\
+Google & COLLSCAN & 15\,303 & 0 & 2\,694\,786 & 7\,310 \\
+Microsoft & IXSCAN & 12\,547 & 19\,460 & 19\,428 & 749 \\
+Microsoft & COLLSCAN & 12\,547 & 0 & 1\,761\,048 & 4\,538 \\
+\bottomrule
+\end{tabular}
+\end{table}

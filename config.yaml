@@ -51,3 +51,13 @@ analisis:
     municipio: data/processed/resultados_municipio.csv
     subregion: data/processed/resultados_subregion.csv
   carpeta_informe: Entrega 4
+
+potencial:
+  # Supuestos de la estimación de orden de magnitud del informe final
+  # (src/analisis/potencial.py). Se aplican al área conservadora min(A_G, A_M).
+  aprovechamiento: 0.40            # fracción del techo útil para módulos
+  aprovechamiento_rango: [0.30, 0.50]
+  densidad_kwp_m2: 0.20            # módulo de ~20 % de eficiencia (1 kW/m2 en STC)
+  irradiacion_kwh_m2_dia: 4.5      # promedio nacional, Atlas de Radiación Solar (UPME-IDEAM)
+  rendimiento_global: 0.80         # pérdidas de inversor, temperatura, cableado y suciedad
+  salida_tex: Informe Final/tablas/potencial.tex

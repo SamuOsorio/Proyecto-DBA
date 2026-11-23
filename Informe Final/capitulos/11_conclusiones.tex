@@ -1,0 +1,31 @@
+% =====================================================================
+% 11. Conclusiones
+% =====================================================================
+\section{Conclusiones}
+\label{sec:conclusiones}
+
+El proyecto entrega a la UPME una metodología reproducible, construida sobre
+MongoDB, para contar las edificaciones y estimar el área de techos de los 170
+municipios PDET con dos fuentes abiertas. El flujo va de los límites oficiales
+del DANE y las huellas de Google y Microsoft hasta una colección
+\campo{resultados} con 680 documentos verificados contra los conteos de las
+colecciones, y de ahí a tablas, mapas, un ranking y una estimación de potencia,
+todo con un solo comando y desde una base vacía.
+
+Las decisiones de base de datos sostienen el resultado: los índices
+\campo{2dsphere} hacen que la asignación de 4,5 millones de edificios use
+\campo{IXSCAN} y no recorra las colecciones; la regla del centroide evita
+contar dos veces un techo en el límite; la agregación corre dentro de la base;
+los validadores \campo{\$jsonSchema} y el índice único sobre \campo{geom\_hash}
+garantizan la integridad; y \campo{fuentes} y \campo{bitacora\_cargas} dejan
+trazado de dónde viene cada dato y con qué parámetros se calculó. La asignación
+coincidió al 100\,\% con una implementación independiente en GeoPandas.
+
+En cuanto a los resultados, las dos fuentes coinciden en el total (222 y
+221\,km\textsuperscript{2}) y en el orden de los municipios, pero no en el
+Pacífico, donde Google tiene huecos de detección. El área se concentra: 15
+municipios, encabezados por Santa Marta, Valledupar y Buenaventura, suman el
+39\,\% del área conservadora, con una potencia instalable del orden de
+6\,GWp. Esos municipios son los candidatos naturales para los pilotos; los del
+Pacífico requieren verificación antes de decidir, y cualquier dimensionamiento
+debe refinar el área útil y cruzarla con la irradiación y la demanda local.

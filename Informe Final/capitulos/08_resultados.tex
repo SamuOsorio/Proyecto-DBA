@@ -1,0 +1,153 @@
+% =====================================================================
+% 8. Resultados
+% =====================================================================
+\section{Resultados}
+\label{sec:resultados}
+
+Salvo que se diga otra cosa, los resultados usan el \textbf{escenario base}:
+Google con confianza $\geq 0{,}65$ y Microsoft completo. Las tablas por
+municipio están en \ruta{data/processed/resultados_municipio.csv} (680 filas:
+170 municipios por cuatro combinaciones de fuente y umbral), y el ranking
+completo en \ruta{data/processed/ranking_municipios.csv}.
+
+\subsection{Totales y comparación entre fuentes}
+
+Las dos fuentes casi coinciden en área total (222,17 y
+221,13\,km\textsuperscript{2}) aunque Google tiene 1,53 veces más edificios,
+porque divide la misma superficie en huellas más pequeñas. La coincidencia
+también se da municipio por municipio: la correlación entre el área de las dos
+fuentes es de 0,99 (Pearson) y 0,94 (Spearman) sobre los 170 municipios.
+
+\fig[0.85\textwidth]{res_dispersion_municipio.png}{0.4}{Área total por
+municipio PDET: Google frente a Microsoft (escala logarítmica). La recta
+punteada es 1:1. Los cinco municipios sin edificios de Google no aparecen.}{fig:res-dispersion}
+
+La mayoría de los municipios cae cerca de la recta 1:1. Los que se separan son
+pocos, y los más alejados quedan por debajo, es decir, con menos área en
+Google: Sipí, López de Micay, Condoto, Carmen del Darién y Ricaurte, todos del
+Pacífico.
+
+\subsection{Resultados por subregión}
+
+\tabla{tabla_subregion}
+
+La diferencia entre fuentes no es uniforme. Google tiene más área en el Caribe
+(Sierra Nevada - Perijá, Urabá Antioqueño, Montes de María, con $D$ entre
+$+0{,}07$ y $+0{,}09$) y Microsoft en el Pacífico y el sur (Chocó, Sur del
+Tolima, Pacífico y Frontera Nariñense, con $D$ entre $-0{,}21$ y $-0{,}33$). El
+total casi coincide porque los excesos y los faltantes se compensan.
+
+\subsection{Sensibilidad al umbral de confianza}
+\label{sec:sensibilidad}
+
+\tabla{sensibilidad}
+
+\fig[0.9\textwidth]{res_sensibilidad_umbral.png}{0.3}{Edificios y área total de
+Google según el umbral de confianza, con Microsoft como referencia.}{fig:res-sensibilidad}
+
+Subir el umbral quita muchos más edificios que área: con 0,70 se pierde el
+16\,\% de los edificios pero solo el 7\,\% del área, y con 0,75 el 35\,\% y el
+19\,\%. Los edificios de baja confianza son, sobre todo, huellas pequeñas. Con
+0,75 el área de Google (179,6\,km\textsuperscript{2}) queda 19\,\% por debajo de
+Microsoft, así que el umbral sí cambia la conclusión sobre qué fuente tiene más
+techo. El orden de los municipios, en cambio, es estable: los 15 con más área
+con 0,65 siguen en el top 15 con 0,70, y 14 de 15 con 0,75. Por eso 0,65 es el
+escenario base y los otros dos se reportan como sensibilidad.
+
+\subsection{Mapas por municipio}
+\label{sec:mapas}
+
+Los mapas (\campo{mapas.py}) usan las mismas clases para las dos fuentes
+(quintiles calculados sobre los 340 valores juntos, sin ceros), para que el
+mismo color signifique lo mismo en los dos paneles. Las áreas se expresan en
+hectáreas (1\,ha $=$ 10\,000\,m\textsuperscript{2}).
+
+\fig{mapa_area_fuentes.png}{0.45}{Área de techos por municipio PDET, Google
+(izquierda) y Microsoft (derecha), con las mismas clases. En gris con trama,
+los 5 municipios sin edificios en Google.}{fig:mapa-fuentes}
+
+Los dos mapas cuentan la misma historia en casi todo el territorio. El área se
+concentra en los municipios con cabeceras urbanas grandes (Santa Marta y
+Valledupar superan las 1\,300\,ha con las dos fuentes) y en la Sierra Nevada -
+Perijá, Urabá, el norte del Cauca y el piedemonte caqueteño. Los municipios
+extensos de la Amazonía y la Orinoquía ocupan buena parte del mapa pero tienen
+poca área de techos. La diferencia visible está en el Chocó y la costa
+pacífica nariñense, más claros en Google.
+
+\fig[0.9\textwidth]{mapa_diferencia.png}{0.45}{Índice de diferencia $D$ entre
+Google y Microsoft por municipio. Naranja: más área en Microsoft; azul: más en
+Google; gris: coinciden ($|D| \leq 0{,}1$).}{fig:mapa-diferencia}
+
+En 98 de los 170 municipios las fuentes coinciden dentro de $\pm 10$\,\% y en
+otros 49 la diferencia es moderada. Los 23 con desacuerdo fuerte
+($|D| > 0{,}3$) no están repartidos al azar: 12 son del Chocó y 6 del Pacífico
+y Frontera Nariñense, e incluyen los 5 sin edificios en Google y otros como
+Sipí, López de Micay, Ricaurte y Carmen del Darién, donde Google detecta menos
+del 10\,\% del área de Microsoft. Solo uno tiene mucha más área en Google:
+Istmina ($D = +0{,}60$).
+
+\fig[0.85\textwidth]{mapa_pct_techos.png}{0.42}{Porcentaje de la superficie
+municipal cubierta por techos (promedio de las dos fuentes). Clases por
+quintiles.}{fig:mapa-pct}
+
+El área total favorece a los municipios grandes; normalizada por la superficie,
+la mediana es 0,077\,\%. Piendamó - Tunía (1,33\,\%), Santander de Quilichao
+(0,78\,\%), Apartadó (0,65\,\%) y Santa Marta (0,64\,\%) encabezan, y el norte
+del Cauca es la zona más densa.
+
+\subsection{Ranking de municipios candidatos}
+\label{sec:ranking}
+
+El ranking (\campo{ranking.py}) ordena por área conservadora,
+$\min(A_G, A_M)$, y marca los municipios con fuentes en desacuerdo.
+
+\tabla{ranking}
+
+\fig[0.95\textwidth]{ranking_top15.png}{0.4}{Área de techos de los 15
+municipios candidatos según cada fuente, ordenados por el área
+conservadora.}{fig:ranking}
+
+Los 15 municipios suman 7\,775\,ha de área conservadora, el 39\,\% del total de
+los 170 (20\,156\,ha), y ninguno tiene las fuentes en desacuerdo: el criterio
+deja fuera, sin necesidad de una regla adicional, a los municipios donde los
+datos no son confiables. El ranking es estable: 13 de los 15 coinciden con el
+top 15 que saldría de usar solo Google o solo Microsoft, y el umbral de
+confianza no cambia cuáles lo encabezan. Están representadas 11 de las 16
+subregiones, con Santa Marta, Valledupar y Ciénaga (Sierra Nevada - Perijá) a
+la cabeza.
+
+\subsection{Estimación de potencia instalable}
+\label{sec:potencial}
+
+El área de techos no es todavía potencial energético. Para dar una idea de la
+escala, \campo{potencial.py} convierte el área conservadora de cada municipio
+en potencia pico y energía anual con supuestos explícitos, que se leen de
+\campo{config.yaml}:
+
+\begin{equation}
+  P = A \cdot f_u \cdot \rho, \qquad E = P \cdot H \cdot 365 \cdot PR
+  \label{eq:potencial}
+\end{equation}
+
+\begin{itemize}
+  \item $f_u = 0{,}40$ (rango 0,30 a 0,50): fracción del techo aprovechable
+        para módulos, que descuenta sombras, bordes, orientación,
+        inclinación y techos que no soportan la carga.
+  \item $\rho = 0{,}20$\,kWp/m\textsuperscript{2}: módulos de cerca del
+        20\,\% de eficiencia (1\,kW/m\textsuperscript{2} en condiciones
+        estándar).
+  \item $H = 4{,}5$\,kWh/m\textsuperscript{2}/día: irradiación global
+        promedio de Colombia según el Atlas de Radiación Solar de la UPME y
+        el IDEAM~\cite{atlas}; se usa un solo valor para todo el país.
+  \item $PR = 0{,}80$: rendimiento global del sistema (inversor, temperatura,
+        cableado y suciedad).
+\end{itemize}
+
+\tabla{potencial}
+
+Con estos supuestos, los 170 municipios PDET tendrían unos 16\,GWp de potencia
+instalable en techos (entre 12 y 20\,GWp según el aprovechamiento) y unos
+21\,TWh al año, y el top 15 concentra 6,2\,GWp. Es un \textbf{orden de
+magnitud}, no un dimensionamiento: es el potencial técnico bruto, que supone
+cubrir todos los techos aprovechables, y la irradiación real varía entre
+regiones. La sección~\ref{sec:recomendaciones} propone cómo refinarlo.

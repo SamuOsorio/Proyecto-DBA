@@ -12,6 +12,7 @@ Orden (cada paso es un archivo de src/analisis/, uno por tarea):
   graficas      Jose Eduardo   dispersión y sensibilidad (si el archivo existe)
   mapas         Maria Camila   mapas por fuente, de diferencia y de % de techos
   ranking       Maria Camila   top 15 por área conservadora
+  potencial     Samuel         potencia instalable y energía (orden de magnitud)
 
 Cada paso corre como `python -m src.analisis.<paso>`, igual que a mano, y si
 uno falla el flujo se detiene ahí. Al final imprime cuánto tardó cada paso.
@@ -31,9 +32,9 @@ import time
 from src.common.config import ROOT
 
 PASOS = ["asignacion", "evidencia", "validacion", "agregacion", "sensibilidad",
-         "exportar", "figuras_eda", "graficas", "mapas", "ranking"]
+         "exportar", "figuras_eda", "graficas", "mapas", "ranking", "potencial"]
 OPCIONALES = {"graficas"}           # se salta si el archivo todavía no existe
-SIN_BASE = ["graficas", "mapas", "ranking"]  # leen los CSV y el GeoJSON versionados
+SIN_BASE = ["graficas", "mapas", "ranking", "potencial"]  # leen los CSV y el GeoJSON versionados
 
 
 def correr(pasos: list[str]) -> list[tuple[str, float, str]]:

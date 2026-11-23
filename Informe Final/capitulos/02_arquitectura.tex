@@ -1,0 +1,117 @@
+% =====================================================================
+% 2. Arquitectura y decisiones tecnológicas
+% =====================================================================
+\section{Arquitectura y decisiones tecnológicas}
+\label{sec:arquitectura}
+
+\subsection{Decisiones}
+
+\begin{table}[H]
+\centering\small
+\caption{Decisiones tecnológicas del proyecto.}
+\label{tab:decisiones}
+\begin{tabularx}{\textwidth}{@{}p{2.6cm}p{3.6cm}L@{}}
+\toprule
+\textbf{Decisión} & \textbf{Elección} & \textbf{Justificación} \\
+\midrule
+Motor NoSQL & MongoDB 8 (modelo documental) &
+  Guarda geometrías en GeoJSON de forma nativa, tiene índices \campo{2dsphere}
+  y operadores \campo{\$geoWithin} y \campo{\$geoIntersects}~\cite{mongodb}.
+  Su pipeline de agregación (\campo{\$group}, \campo{\$lookup},
+  \campo{\$merge}) calcula los totales por municipio dentro de la base, y
+  puede escalar horizontalmente con \emph{sharding}. \\
+Fuente de edificios 1 & Google Open Buildings v3 &
+  Cubre América Latina con imágenes de alta resolución (inferencia de mayo
+  de 2023). Trae \campo{area\_in\_meters} y \campo{confidence} (0,65 a 1,0),
+  lo que permite validar las áreas y medir la sensibilidad. Licencia
+  CC BY 4.0 / ODbL. \\
+Fuente de edificios 2 & Microsoft Building Footprints &
+  Imágenes de 2014 a 2021, licencia ODbL. Particionado por país y
+  \emph{quadkey}, así que se descarga solo lo necesario. Solo trae la
+  geometría: el área se calcula. \\
+Límites municipales & MGN 2025 del DANE, nivel municipio &
+  Fuente oficial que exige el enunciado; se filtra con los 170 códigos del
+  listado PDET. \\
+Sistemas de referencia & WGS84 (EPSG:4326) para almacenar; MAGNA-SIRGAS
+  Origen Nacional (EPSG:9377) para áreas &
+  GeoJSON y \campo{2dsphere} exigen \campo{[longitud, latitud]} en WGS84. Las
+  áreas se calculan en la proyección plana oficial de Colombia, en metros. \\
+Herramientas & Python, GeoPandas, Shapely, PyMongo, DuckDB, Docker Compose,
+  GitHub &
+  GeoPandas valida y reproyecta; DuckDB lee y filtra los archivos grandes sin
+  cargarlos completos; PyMongo carga por lotes; Docker Compose levanta la
+  misma base en cualquier máquina. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Flujo de datos}
+
+El flujo tiene cuatro etapas encadenadas por un \campo{Makefile}
+(figura~\ref{fig:flujo}). Cada etapa es una carpeta de \campo{src/} con un
+archivo por tarea, lee sus parámetros de \campo{config.yaml} y deja un
+registro en la colección \campo{bitacora\_cargas}. Las etapas se comunican por
+archivos intermedios en \campo{data/processed/} y por las colecciones de
+MongoDB, así que cada una se puede volver a correr por separado.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  caja/.style={draw=acento, rounded corners=3pt, fill=acento!6, align=center,
+               minimum height=1.25cm, text width=3.0cm},
+  db/.style={draw=gris, rounded corners=3pt, fill=gray!8, align=center, font=\footnotesize,
+             minimum height=0.9cm, text width=3.2cm},
+  flecha/.style={-{Stealth[length=2.2mm]}, thick, gris},
+  node distance=0.55cm and 0.55cm]
+  \node[caja] (m) {\textbf{make municipios}\\ MGN 2025 + PDET\\ validación, carga, índice};
+  \node[caja, right=of m] (e) {\textbf{make edificios}\\ Google y Microsoft\\ prefiltro, limpieza, carga};
+  \node[caja, right=of e] (a) {\textbf{make analisis}\\ asignación, agregación,\\ sensibilidad};
+  \node[caja, right=of a] (s) {\textbf{Salidas}\\ CSV, tablas, mapas,\\ ranking, potencial};
+  \node[db, below=of m] (dm) {\campo{municipios}\\ \campo{fuentes}};
+  \node[db, below=of e] (de) {\campo{edificios\_google}\\ \campo{edificios\_microsoft}};
+  \node[db, below=of a] (da) {\campo{resultados}};
+  \node[db, below=of s] (ds) {\ruta{data/processed/}\\ informe};
+  \draw[flecha] (m) -- (e); \draw[flecha] (e) -- (a); \draw[flecha] (a) -- (s);
+  \draw[flecha] (m) -- (dm); \draw[flecha] (e) -- (de); \draw[flecha] (a) -- (da);
+  \draw[flecha] (s) -- (ds);
+  \draw[flecha, dashed] (dm.east) -- (de.west);
+  \draw[flecha, dashed] (de.east) -- (da.west);
+  \draw[flecha, dashed] (da.east) -- (ds.west);
+\end{tikzpicture}
+\caption{Etapas del flujo (\campo{make all = make up municipios edificios
+analisis}) y colecciones que produce cada una. Todas registran su ejecución en
+\campo{bitacora\_cargas}.}
+\label{fig:flujo}
+\end{figure}
+
+\subsection{Organización del repositorio y del trabajo}
+
+\begin{lstlisting}
+src/common/      conexión a MongoDB y lectura de config.yaml
+src/municipios/  límites PDET: descarga, cruce, geometría, esquema, carga, índices
+src/edificios/   huellas: descarga y limpieza por fuente, esquema, carga, índices
+src/analisis/    asignación, agregación, sensibilidad, figuras, mapas, ranking
+config.yaml      parámetros (CRS, umbrales, rutas, colecciones)
+data/            datos crudos y procesados (solo se versionan las salidas pequeñas)
+Entrega N/       informe de cada entrega; Informe Final/ este documento
+\end{lstlisting}
+
+El equipo trabajó con una rama y un \emph{pull request} por persona y por
+tarea, repartidas por archivo para que las cuatro personas avanzaran en
+paralelo. La tabla~\ref{tab:reparto} resume quién hizo qué.
+
+\begin{table}[H]
+\centering\small
+\caption{Reparto del trabajo por semana.}
+\label{tab:reparto}
+\begin{tabularx}{\textwidth}{@{}p{2.4cm}LLLL@{}}
+\toprule
+\textbf{Semana} & \textbf{Jorge} & \textbf{Maria Camila} & \textbf{Samuel} & \textbf{Jose Eduardo} \\
+\midrule
+2. Límites PDET & Descarga del MGN, cruce y verificación & Geometría y exportación & Esquema, carga, índices y evidencia & Mapa de control y tamaño BSON \\
+3. Edificios & Descarga y limpieza de Google & Descarga y limpieza de Microsoft & Esquema, carga, índices y \campo{make edificios} & EDA \\
+4. Análisis & Asignación, \campo{explain} y validación & Mapas, ranking, \campo{run.py} e integración & Agregación, sensibilidad y exportación & Estilo de figuras y lectura de resultados \\
+\bottomrule
+\end{tabularx}
+\end{table}

@@ -1,0 +1,92 @@
+% =====================================================================
+% 10. Reproducción
+% =====================================================================
+\section{Reproducción del flujo}
+\label{sec:reproduccion}
+
+\subsection{Pasos}
+
+Todo el proyecto se reproduce desde una base vacía con:
+
+\begin{lstlisting}
+git clone https://github.com/SamuOsorio/Proyecto-DBA.git && cd Proyecto-DBA
+cp .env.example .env
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+# copiar el ZIP del MGN 2025 (nivel municipio) en data/raw/mgn_2025/MGN2025.zip
+make all        # = make up municipios edificios analisis
+\end{lstlisting}
+
+\campo{make analisis} corre \campo{src/analisis/run.py}, que ejecuta los pasos
+en orden como \campo{python -m src.analisis.<paso>}; si uno falla, se detiene
+e indica cómo retomar con \campo{--desde <paso>}.
+\campo{--solo-figuras} rehace gráficas, mapas, ranking y potencial a partir de
+los CSV y el GeoJSON versionados, sin necesidad de MongoDB.
+
+\begin{table}[H]
+  \centering\small
+  \caption{Pasos de \campo{make analisis}, en orden.}
+  \label{tab:pasos}
+  \begin{tabularx}{\textwidth}{@{}l L@{}}
+    \toprule
+    \textbf{Paso} & \textbf{Qué produce} \\
+    \midrule
+    \campo{asignacion} & \campo{cod\_mpio} en los edificios; registro en \campo{bitacora\_cargas} \\
+    \campo{evidencia} & \campo{explain()} con IXSCAN y con COLLSCAN \\
+    \campo{validacion} & Comparación con GeoPandas en 10 municipios \\
+    \campo{agregacion} & \campo{resultados}: 170 documentos por fuente y umbral, verificados \\
+    \campo{sensibilidad} & Tabla de sensibilidad al umbral de Google \\
+    \campo{exportar} & CSV por municipio y subregión; tabla por subregión \\
+    \campo{figuras\_eda} & Las figuras del EDA \\
+    \campo{graficas} & Dispersión por municipio y gráfica de sensibilidad \\
+    \campo{mapas} & Mapas por fuente, de diferencia y de \% de techos \\
+    \campo{ranking} & Top 15, tabla y gráfica; ranking completo en CSV \\
+    \campo{potencial} & Potencia instalable y energía por municipio \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Corrida desde base vacía}
+
+Para este informe se borró la base \campo{upme\_solar} y se corrió
+\campo{make all}. Terminó sin errores en unos 14 minutos, incluyendo el
+prefiltro y la limpieza de Google desde los archivos crudos, y reprodujo
+exactamente las mismas cifras: 170 municipios, 2\,694\,786 y 1\,761\,048
+edificios, el mismo edificio sin municipio y 680 documentos en
+\campo{resultados}. Los CSV regenerados solo difieren en la última cifra
+decimal, por redondeo de punto flotante.
+
+\fig[0.75\textwidth]{cap_make_all.png}{0.32}{Corrida de \campo{make all}
+desde una base vacía: resumen de tiempos de la etapa de análisis
+(\campo{run.py}).}{fig:make-all}
+
+\subsection{Parámetros y entorno}
+
+Los parámetros no están escritos en el código: los umbrales de confianza, la
+regla de asignación, los CRS, el tamaño de los lotes, los supuestos de la
+estimación de potencia y las rutas de salida se leen de \campo{config.yaml}.
+La URI de la base vive en \campo{.env}, fuera del repositorio. Cada documento
+de \campo{resultados} guarda el commit del código que lo produjo.
+
+Entorno: MongoDB 8 en Docker Compose y Python 3.12 o superior con las
+versiones de \campo{requirements.txt}. El flujo se corrió en macOS y en Linux,
+con las mismas cifras.
+
+\subsection{Lecciones del proceso}
+
+\begin{itemize}
+  \item Un validador \campo{\$jsonSchema} copiado tal cual del diccionario
+        bloquea el flujo si exige campos que se calculan en una etapa
+        posterior; hubo que declararlos opcionales o nulos.
+  \item Que una geometría sea válida en el plano (GEOS) no garantiza que lo
+        sea en la esfera (S2): crear el índice \campo{2dsphere} antes de
+        cargar convirtió un fallo de todo el índice en el rechazo de unos
+        pocos documentos reparables.
+  \item Separar cada tarea en su propio archivo, comunicadas por archivos
+        intermedios y colecciones, permitió que cuatro personas trabajaran en
+        paralelo, a cambio de coordinar el orden de los pasos en
+        \campo{run.py}.
+  \item Guardar los CSV de resultados en el repositorio permitió rehacer
+        mapas y figuras sin tener la base cargada, lo que aceleró la revisión
+        de las gráficas.
+\end{itemize}

@@ -1,0 +1,150 @@
+% =====================================================================
+% 7. Metodología del cálculo (semana 4)
+% =====================================================================
+\section{Metodología del cálculo}
+\label{sec:metodologia}
+
+Las métricas de la ecuación~(\ref{eq:area}) se calculan en dos pasos dentro
+de MongoDB: primero se asigna cada edificio a un municipio
+(\campo{asignacion.py}) y después se agrega por municipio, fuente y umbral
+(\campo{agregacion.py}). Una validación independiente en GeoPandas comprueba
+la asignación.
+
+\subsection{Asignación por centroide}
+\label{sec:asignacion}
+
+\textbf{Regla.} Un edificio pertenece al municipio que contiene su centroide.
+Así un techo que cruza el límite entre dos municipios se cuenta una sola vez,
+y basta un índice sobre puntos, más barato que uno sobre polígonos.
+
+\textbf{Procedimiento.} Para cada uno de los 170 municipios se ejecuta un
+\campo{updateMany} con \campo{\$geoWithin} sobre \campo{centroide}, usando la
+geometría del municipio como ventana:
+
+\begin{lstlisting}[language=Python]
+coleccion.update_many(
+    {"cod_mpio": None,
+     "centroide": {"$geoWithin": {"$geometry": municipio["geometry"]}}},
+    {"$set": {"cod_mpio": municipio["_id"]}})
+\end{lstlisting}
+
+El filtro \campo{cod\_mpio: null} hace que el paso sea reanudable y que un
+edificio no se reasigne. La ejecución queda en \campo{bitacora\_cargas}.
+
+\tabla{asignacion_resumen}
+
+En Microsoft todos los edificios quedaron asignados; en Google, todos menos
+uno. Los tiempos de la tabla~\ref{tab:asignacion} son de una corrida en otra
+máquina; en la corrida desde base vacía de la sección~\ref{sec:reproduccion}
+la asignación tomó 101,5\,s en Google y 68,1\,s en Microsoft, con exactamente
+las mismas cifras.
+
+\textbf{El edificio sin municipio.} Su centroide (-72,97638; 9,15139) está a
+0,011\,m del límite de Convención (54206), prácticamente sobre la frontera. En
+un caso así, la diferencia entre las aristas geodésicas que usa
+\campo{\$geoWithin} sobre la esfera y las aristas planas de la geometría puede
+dejar el punto fuera. Es un edificio de 2,7 millones (0,00004\,\%), sin efecto
+en los resultados.
+
+\textbf{Plan de ejecución.} \campo{evidencia.py} corre
+\campo{explain("executionStats")} sobre la consulta de asignación en Caldono
+(19137), con el índice \campo{centroide\_2dsphere} y forzando
+\campo{COLLSCAN} con \campo{hint(\{\$natural: 1\})}.
+
+\tabla{evidencia_geowithin}
+
+Con el índice, la consulta de Google examinó 25\,071 documentos en 730\,ms; sin
+él recorrió los 2\,694\,786 en 7\,310\,ms: 107 veces más documentos y 10 veces
+más tiempo. En Microsoft, 91 veces más documentos y 6 veces más tiempo. Las dos
+variantes devuelven los mismos edificios. El índice examina más documentos de
+los que devuelve porque primero filtra por celdas S2 y luego verifica la
+geometría exacta.
+
+\fig{cap_explain_geowithin.png}{0.3}{\campo{explain("executionStats")} con
+\campo{IXSCAN} y con \campo{COLLSCAN}.}{fig:explain}
+
+\subsection{Validación independiente con GeoPandas}
+\label{sec:validacion}
+
+\campo{validacion.py} repite la asignación fuera de MongoDB en una muestra de
+10 municipios (dos del Chocó, tres grandes, tres pequeños y los dos sin
+edificios de Google que tienen más edificios en Microsoft): cruza los
+centroides con los límites con \campo{sjoin(predicate="within")} en el plano y
+compara los conteos.
+
+\tabla{validacion_asignacion}
+
+En las 20 comparaciones la diferencia fue cero, sin edificios exclusivos de
+ninguno de los dos métodos. La asignación de MongoDB coincide con una
+implementación independiente.
+
+\subsection{Agregación en \texorpdfstring{\campo{resultados}}{resultados}}
+\label{sec:agregacion}
+
+Cada combinación de fuente y umbral de confianza es una sola pipeline que corre
+dentro de MongoDB y escribe directamente en \campo{resultados}:
+
+\begin{lstlisting}[language=Python]
+[{"$match": {"cod_mpio": {"$ne": None},
+             "confianza": {"$gte": u}}},     # solo Google
+ {"$group": {"_id": "$cod_mpio", "n": {"$sum": 1},
+             "area": {"$sum": "$area_m2"},
+             "media": {"$avg": "$area_m2"}}},
+ {"$lookup": {"from": "municipios", "localField": "_id",
+              "foreignField": "_id", "as": "m"}},
+ {"$unwind": "$m"},
+ {"$project": {"_id": {"cod_mpio": "$_id", "fuente_id": f, "umbral": u},
+   "n_edificios": "$n", "area_total_m2": "$area", "area_media_m2": "$media",
+   "densidad_km2": {"$divide": ["$n", "$m.area_km2"]},
+   "pct_techos": {"$multiply": [100, {"$divide":
+       ["$area", {"$multiply": ["$m.area_km2", 1e6]}]}]},
+   "parametros": {...}, "fecha_calculo": "$$NOW"}},
+ {"$merge": {"into": "resultados", "on": "_id",
+             "whenMatched": "replace"}}]
+\end{lstlisting}
+
+Una segunda pipeline, sobre \campo{municipios}, completa con ceros los
+municipios sin edificios (\campo{\$merge} con
+\campo{whenMatched: "keepExisting"}), así siempre hay 170 documentos por fuente
+y umbral. Antes de escribir se borran los documentos de esa combinación, de
+modo que correr el paso dos veces deja exactamente lo mismo. Los umbrales
+(0,65, 0,70 y 0,75) se leen de \campo{config.yaml}, y cada documento guarda en
+\campo{parametros} el umbral, la regla de asignación, el CRS de las áreas y el
+commit del código que lo produjo. Cada pipeline tarda entre 2 y 5\,s.
+
+\subsection{Verificación de los resultados}
+\label{sec:verificacion}
+
+Después de escribir, el script comprueba para cada combinación que haya 170
+documentos y que la suma de \campo{n\_edificios} sea igual al número de
+edificios asignados que pasan el filtro; si algo falla, termina con error. Las
+cuatro combinaciones pasaron:
+
+\begin{itemize}
+  \item Google 0,65: 2\,694\,785, el total de la colección menos el edificio
+        sin municipio.
+  \item Google 0,70 y 0,75: 2\,263\,445 y 1\,751\,076, iguales al conteo
+        directo con \campo{cod\_mpio} asignado y confianza mayor o igual al
+        umbral.
+  \item Microsoft: 1\,761\,048, el total de la colección.
+\end{itemize}
+
+\subsection{Indicadores derivados para comparar y ordenar}
+\label{sec:indicadores}
+
+Para comparar las fuentes y ordenar los municipios se usan tres indicadores,
+calculados sobre el escenario base (Google 0,65):
+
+\begin{itemize}
+  \item \textbf{Índice de diferencia}
+        $D = (A_G - A_M)/(A_G + A_M)$, entre $-1$ (solo Microsoft tiene
+        edificios) y $+1$ (solo Google). Se considera que las fuentes
+        coinciden si $|D| \leq 0{,}1$ y que están en fuerte desacuerdo si
+        $|D| > 0{,}3$.
+  \item \textbf{Área conservadora} $\min(A_G, A_M)$: el área de techos que
+        las dos fuentes respaldan a la vez. Es el criterio del ranking, para
+        que un municipio no suba solo porque una fuente lo sobreestima.
+  \item \textbf{Porcentaje de techos}: fracción de la superficie municipal
+        cubierta por techos (promedio de las dos fuentes), que indica si el
+        área está concentrada en un casco urbano.
+\end{itemize}

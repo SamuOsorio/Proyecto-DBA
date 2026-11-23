@@ -216,12 +216,13 @@ exige el índice \campo{2dsphere}) y las áreas se calculan en EPSG:9377 (metros
 El índice único sobre \campo{geom\_hash} confirmó que no hay duplicados.
 
 \textbf{Eficiencia de carga.} Los Parquet se leen por lotes de 5\,000 filas y
-se insertan con \campo{insert\_many(ordered=False)}; los índices de
+se insertan con \campo{insert\_many} y \campo{ordered=False}; los índices de
 \campo{centroide}, \campo{cod\_mpio} y \campo{geom\_hash} se crean después de
 cargar, porque mantenerlos durante la inserción es más lento. Google se cargó
 en 56,6\,s (47\,621\,docs/s) y Microsoft en 37,7\,s (46\,753\,docs/s). En esta
 semana se sumó el costo de la asignación: 269,9\,s para Google y 182,1\,s para
-Microsoft usando el índice \campo{centroide\_2dsphere}; sin él, una sola
+Microsoft usando el índice \campo{centroide\_2dsphere} (en otra máquina, la
+corrida de la figura~\ref{fig:make-all} tardó 173,1\,s para las dos); sin él, una sola
 consulta \campo{\$geoWithin} recorre la colección completa y tarda unas 10
 veces más (sección~\ref{sec:explain4}).
 
@@ -452,7 +453,7 @@ Los parámetros no están escritos en el código: el umbral base y los umbrales
 de sensibilidad, la regla de asignación, los CRS y las rutas de salida se leen
 de \campo{config.yaml}, y cada documento de \campo{resultados} guarda en
 \campo{parametros} el umbral, la regla, el CRS de las áreas y el commit del
-código que lo produjo. Entorno: MongoDB 8 en Docker, Python 3.12 y las
+código que lo produjo. Entorno: MongoDB 8 en Docker, Python 3.12 o superior y las
 versiones fijadas en \campo{requirements.txt}.
 
 \figopcional{cap_make_all}{Corrida de \campo{make all} desde una base vacía:

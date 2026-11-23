@@ -1,0 +1,166 @@
+% =====================================================================
+% 3. Modelo de datos
+% =====================================================================
+\section{Modelo de datos}
+\label{sec:modelo}
+
+\subsection{Diagrama E-R y decisiones de modelado}
+
+El esquema vive en la base \campo{upme\_solar} y tiene seis colecciones. Las
+centrales son los municipios y los edificios, que se relacionan por una
+consulta espacial: cada edificio pertenece al municipio que contiene su
+centroide (figura~\ref{fig:er}).
+
+\fig{diagrama_er.png}{0.45}{Diagrama E-R del esquema en MongoDB (notación pata
+de gallo). La línea azul es la relación espacial: \campo{cod\_mpio} se llena con
+\campo{\$geoWithin}. $\blacklozenge$ marca un índice \campo{2dsphere}; los
+campos indentados son subdocumentos embebidos.}{fig:er}
+
+Cada relación es una referencia por \campo{\_id}: dos barras indican
+exactamente uno, círculo y barra cero o uno, y círculo con pata de gallo cero
+o muchos. Las decisiones principales fueron:
+
+\begin{itemize}
+  \item \textbf{Subregión PDET embebida en el municipio.} Es un dato pequeño,
+        estable y que siempre se lee junto con el municipio.
+  \item \textbf{Edificios referenciados, no embebidos.} Un municipio puede
+        tener cientos de miles de edificios; embebidos superarían el límite de
+        16\,MB por documento. Cada edificio guarda \campo{cod\_mpio}.
+  \item \textbf{Una colección por fuente de edificios}, con el mismo esquema,
+        para cargarlas, reindexarlas y compararlas por separado.
+  \item \textbf{Centroide guardado aparte.} La asignación solo necesita un
+        punto, e indexar un punto es más barato que indexar un polígono.
+  \item \textbf{Resultados precalculados} en \campo{resultados}, para que los
+        mapas y el informe no repitan la consulta espacial.
+  \item \textbf{Trazabilidad:} la colección \campo{fuentes} guarda el origen y el
+        SHA-256 de cada descarga, y \campo{bitacora\_cargas} cada ejecución
+        con sus parámetros.
+\end{itemize}
+
+\campo{municipios}, \campo{fuentes}, las dos de edificios y \campo{resultados}
+tienen un validador \campo{\$jsonSchema} derivado de este diccionario, así que MongoDB rechaza al insertar cualquier
+documento que no lo cumpla (error 121; anexo~\ref{sec:anexo}).
+
+\subsection{Diccionario de datos}
+
+Todas las geometrías están en GeoJSON con \campo{[longitud, latitud]} en WGS84,
+y todas las áreas en m\textsuperscript{2} calculados en EPSG:9377. Las tablas
+reflejan el esquema final, con los ajustes hechos durante el proyecto.
+
+\begin{table}[H]
+\centering\small
+\caption{Colección \campo{municipios} (170 documentos).}
+\label{tab:dicc-mpio}
+\begin{tabularx}{\textwidth}{@{}p{3cm}p{3.6cm}Lp{2.4cm}@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} & \textbf{Origen} \\
+\midrule
+\campo{\_id} & string & Código DANE a 5 dígitos (\campo{05045}) & MGN / Excel PDET \\
+\campo{nombre} & string & Nombre del municipio & MGN \\
+\campo{cod\_dpto}, \campo{departamento} & string & Código y nombre del departamento & MGN \\
+\campo{subregion\_pdet} & objeto \{id: int, nombre\} & Subregión PDET (una de 16), embebida & Excel PDET \\
+\campo{area\_km2} & double & Área del municipio & Calculado (EPSG:9377) \\
+\campo{geometry} & GeoJSON Polygon o MultiPolygon & Límite municipal & MGN reproyectado \\
+\campo{calidad} & objeto \{valida, reparada, n\_vertices\} & Resultado de la validación de la geometría & Calculado \\
+\campo{fuente\_id} & string & Referencia a \campo{fuentes} (\campo{mgn}) & Calculado \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Colecciones \campo{edificios\_google} y \campo{edificios\_microsoft}
+(mismo esquema).}
+\label{tab:dicc-edif}
+\begin{tabularx}{\textwidth}{@{}p{2.8cm}p{3.1cm}Lp{2.4cm}@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} & \textbf{Origen} \\
+\midrule
+\campo{\_id} & ObjectId & Identificador interno & MongoDB \\
+\campo{fuente\_id} & \campo{google} o \campo{microsoft} & Referencia a \campo{fuentes} & Calculado \\
+\campo{geometry} & GeoJSON Polygon & Huella del edificio & Fuente \\
+\campo{centroide} & GeoJSON Point & Centroide de la huella; base de la asignación & Calculado (EPSG:9377) \\
+\campo{area\_m2} & double $\geq 0$ & Área de la huella & Calculado (EPSG:9377) \\
+\campo{area\_m2\_fuente} & double o null & Área que reporta Google; null en Microsoft & Fuente \\
+\campo{confianza} & double en $[0,1]$ o null & Confianza del modelo (0,65 a 1,0); null en Microsoft & Fuente \\
+\campo{cod\_mpio} & string (5 dígitos) o null & Referencia a \campo{municipios}, llenada por la asignación & Calculado \\
+\campo{geom\_hash} & string (índice único) & Hash de la geometría normalizada, contra duplicados & Calculado \\
+\campo{lote\_id} & ObjectId & Carga que trajo el registro (\campo{bitacora\_cargas}) & Calculado \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Colección \campo{resultados} (680 documentos: 170 municipios por
+Google con tres umbrales y Microsoft).}
+\label{tab:dicc-res}
+\begin{tabularx}{\textwidth}{@{}p{3.2cm}p{3.6cm}L@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+\midrule
+\campo{\_id} & objeto \{cod\_mpio, fuente\_id, umbral\} & Un documento por municipio, fuente y umbral (\campo{umbral: null} en Microsoft) \\
+\campo{n\_edificios} & int o long & Edificios cuyo centroide cae en el municipio \\
+\campo{area\_total\_m2} & double & Suma de \campo{area\_m2} \\
+\campo{area\_media\_m2} & double o null & Área promedio (null si no hay edificios) \\
+\campo{densidad\_km2} & double & Edificios por km\textsuperscript{2} del municipio \\
+\campo{pct\_techos} & double en $[0, 100]$ & Área de techos sobre el área del municipio, en \% \\
+\campo{parametros} & objeto & Umbral, regla de asignación, CRS de las áreas y commit del código \\
+\campo{fecha\_calculo} & date & Cuándo se calculó \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Colecciones \campo{fuentes} y \campo{bitacora\_cargas}.}
+\label{tab:dicc-fuentes}
+\begin{tabularx}{\textwidth}{@{}p{3.8cm}p{2.4cm}L@{}}
+\toprule
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{\campo{fuentes}} (una por dataset: \campo{mgn}, \campo{google}, \campo{microsoft})} \\
+\campo{\_id}, \campo{nombre}, \campo{version}, \campo{licencia} & string & Identificación del dataset \\
+\campo{url\_descarga}, \campo{crs\_origen} & string & Origen exacto y CRS en que llegan los datos \\
+\campo{fecha\_descarga} & date & Cuándo se descargó \\
+\campo{checksum\_sha256} & string & SHA-256 de la descarga \\
+\campo{periodo\_imagenes} & string o null & Fechas de las imágenes (no aplica al MGN) \\
+\campo{n\_registros} & long o null & Registros cargados; lo completa la carga \\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{\campo{bitacora\_cargas}} (una por ejecución)} \\
+\campo{fuente\_id}, \campo{etapa} & string & Fuente y etapa (\campo{descarga}, \campo{limpieza}, \campo{carga}, \campo{indices}, \campo{analisis}) \\
+\campo{inicio}, \campo{fin} & date & Duración de la etapa \\
+\campo{registros\_ok}, \campo{registros\_error} & long & Resultado de la etapa \\
+\campo{parametros} & objeto & Copia de la configuración usada \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Cambios respecto al diseño inicial.} En \campo{fuentes},
+\campo{periodo\_imagenes} y \campo{n\_registros} pasaron a aceptar \campo{null}
+y se agregó \campo{checksum\_sha256}; exigirlos desde el primer
+\emph{insert} bloqueaba el flujo, porque se completan en otra etapa. En
+\campo{resultados}, la llave pasó de \campo{\{cod\_mpio, fuente\_id\}} a
+\campo{\{cod\_mpio, fuente\_id, umbral\}} para guardar la sensibilidad en la
+misma colección.
+
+\subsection{Índices}
+
+\begin{table}[H]
+\centering\small
+\caption{Índices del esquema.}
+\label{tab:indices}
+\begin{tabularx}{\textwidth}{@{}p{3.2cm}p{4.4cm}L@{}}
+\toprule
+\textbf{Colección} & \textbf{Índice} & \textbf{Para qué} \\
+\midrule
+\campo{municipios} & \campo{2dsphere} sobre \campo{geometry} & Consultas espaciales sobre los límites \\
+\campo{municipios} & \campo{subregion\_pdet.id} & Resúmenes por subregión \\
+\campo{edificios\_*} & \campo{2dsphere} sobre \campo{centroide} & Asignación con \campo{\$geoWithin} (consulta principal) \\
+\campo{edificios\_*} & \campo{2dsphere} sobre \campo{geometry} & \campo{\$geoIntersects} sobre edificios en los límites \\
+\campo{edificios\_*} & \campo{cod\_mpio} & Agregación por municipio \\
+\campo{edificios\_*} & \campo{geom\_hash} (único) & Impedir duplicados \\
+\campo{resultados} & \campo{\_id} compuesto & Búsqueda por municipio, fuente y umbral \\
+\bottomrule
+\end{tabularx}
+\end{table}

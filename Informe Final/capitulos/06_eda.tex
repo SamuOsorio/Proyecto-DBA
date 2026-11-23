@@ -1,0 +1,78 @@
+% =====================================================================
+% 6. Análisis exploratorio
+% =====================================================================
+\section{Análisis exploratorio de las huellas}
+\label{sec:eda}
+
+El EDA se hizo sobre los dos Parquet completos, sin muestreo
+(\ruta{notebooks/eda_edificios.ipynb}); las figuras se regeneran con
+\campo{src/analisis/figuras\_eda.py}. Sus cifras coinciden con los documentos
+cargados en MongoDB.
+
+\subsection{Totales y tamaño de las huellas}
+
+\begin{table}[H]
+\centering\small
+\caption{Totales por fuente sobre los 170 municipios PDET (áreas en EPSG:9377).}
+\label{tab:eda-totales}
+\begin{tabularx}{\textwidth}{@{}Lrrrr@{}}
+\toprule
+\textbf{Fuente} & \textbf{Edificios} & \textbf{Área total (km\textsuperscript{2})} & \textbf{Área media (m\textsuperscript{2})} & \textbf{Mediana (m\textsuperscript{2})} \\
+\midrule
+Google Open Buildings & 2\,694\,786 & 222,17 & 82,45 & 57,87 \\
+Microsoft Building Footprints & 1\,761\,048 & 221,13 & 125,57 & 76,99 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Google tiene 1,53 veces más edificios que Microsoft, pero más pequeños: su área
+media es un tercio menor y su mediana un 25\,\% menor. Aun así, el área total
+es casi igual (diferencia de 1,04\,km\textsuperscript{2}, menos del 0,5\,\%):
+Google reparte la misma superficie en más huellas. En Microsoft la cola de
+edificios grandes es más larga (p99 de 912\,m\textsuperscript{2} frente a
+445\,m\textsuperscript{2}).
+
+\fig{eda_confianza_area.png}{0.28}{Izquierda: distribución de áreas por fuente
+(escala logarítmica, medianas marcadas). Derecha: distribución de la confianza
+de Google, con los umbrales 0,70 y 0,75 señalados.}{fig:eda-confianza}
+
+La confianza de Google va de 0,65 a 0,98 (media y mediana 0,78). Ningún
+registro queda por debajo de 0,65, porque Google solo publica detecciones por
+encima de ese valor; por eso 0,65 es el escenario base y 0,70 y 0,75 se usan
+para medir la sensibilidad (sección~\ref{sec:sensibilidad}).
+
+\subsection{Validación del área calculada}
+
+Para Google se comparó \campo{area\_m2} (calculada en EPSG:9377) con
+\campo{area\_m2\_fuente} (la de Google). La correlación es prácticamente
+perfecta y la diferencia relativa tiene mediana 0 y percentiles 5 y 95 de
+$\pm$1\,\%; las diferencias mayores son huellas muy pequeñas, donde un redondeo
+pesa mucho. El cálculo de área no tiene sesgos sistemáticos.
+
+\fig{eda_comparacion.png}{0.26}{Izquierda: área calculada frente a la de Google
+(recta 1:1). Centro: diferencia relativa. Derecha: área total por fuente.}{fig:eda-comparacion}
+
+\subsection{Distribución por subregión y cobertura}
+
+Las dos fuentes concentran sus edificios en las mismas subregiones, pero en
+distinta proporción: la Sierra Nevada - Perijá tiene 645\,009 edificios en
+Google y 295\,383 en Microsoft. El Chocó es la subregión con menos edificios en
+Google (20\,722) y no en Microsoft (37\,692): la primera señal de que las
+fuentes no cubren el territorio igual.
+
+\fig{eda_subregion.png}{0.3}{Edificios por subregión PDET y fuente.}{fig:eda-subregion}
+
+El mapa de densidad de centroides (figura~\ref{fig:eda-mapa}) muestra dónde
+están los huecos: cinco municipios no tienen ningún edificio en Google
+(Murindó y Vigía del Fuerte en Antioquia; Medio San Juan, Nóvita y Bojayá en el
+Chocó), mientras que Microsoft tiene entre 1\,331 y 2\,004 en cada uno. Otros
+tienen muy pocos en Google, como Sipí (1), López de Micay (24) y Condoto (239).
+
+\fig{eda_mapa_densidad.png}{0.4}{Densidad de centroides por fuente sobre los
+municipios PDET (escala logarítmica común). En rojo, los cinco municipios sin
+edificios de Google.}{fig:eda-mapa}
+
+Las figuras de esta sección son la versión corregida de las del EDA original,
+rehechas con un estilo común para todo el informe (textos en español, escalas
+logarítmicas reales, miles separados y la misma escala de color en los dos
+paneles), atendiendo la retroalimentación recibida sobre las gráficas.

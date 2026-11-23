@@ -1,0 +1,217 @@
+% =====================================================================
+% 5. Huellas de edificios (semana 3)
+% =====================================================================
+\section{Huellas de edificios}
+\label{sec:edificios}
+
+\campo{make edificios} (\campo{src/edificios/run.py}) procesa cada fuente
+con el mismo esquema: descarga con SHA-256, prefiltro a PDET por la regla del
+centroide, limpieza compartida (\campo{comun.py}) hacia un Parquet con el
+mismo contrato de columnas, y carga e índices en MongoDB.
+
+\begin{table}[H]
+  \centering\small
+  \caption{Adquisición y limpieza de las dos fuentes.}
+  \label{tab:edif-resumen}
+  \begin{tabularx}{\textwidth}{@{}L r r@{}}
+    \toprule
+    & \textbf{Google Open Buildings v3} & \textbf{Microsoft Building Footprints} \\
+    \midrule
+    Archivos descargados & 8 celdas S2 (3,11\,GB) & 125 \emph{quadkeys} (373,4\,MB) \\
+    Edificios leídos & 16\,512\,141 (en Colombia) & 4\,595\,615 \\
+    Edificios en PDET (en la colección) & 2\,694\,786 & 1\,761\,048 \\
+    Polígonos inválidos reparados (GEOS) & 0 & 28 \\
+    Reparados en la carga (validación esférica) & 0 & 29 \\
+    Duplicados por \campo{geom\_hash} & 0 & 0 \\
+    Licencia & CC BY 4.0 / ODbL & ODbL \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Google Open Buildings: descarga y prefiltro}
+\label{sec:google}
+
+Google publica sus edificios en CSV comprimidos, uno por celda S2 de nivel~4.
+Cada edificio trae su polígono en WKT, el centroide, el área que calcula
+Google (\campo{area\_in\_meters}) y la confianza del modelo
+(\campo{confidence}, 0,65 a 1,0).
+
+\textbf{Descarga.} \campo{descarga\_google.py} cruza la tabla de celdas que
+publica Google con la unión de los 170 municipios: quedan 8 celdas (3,11\,GB)
+de las 10 que tocan Colombia. Cada celda se baja en \emph{streaming}, se
+reanuda si se corta, se verifica su tamaño y se calcula su SHA-256; el SHA-256
+de la fuente (hash de la lista ordenada de pares \campo{token:sha256}) se
+guarda en \campo{fuentes} y dio el mismo valor en dos máquinas distintas.
+
+\textbf{Prefiltro con DuckDB.} Las 8 celdas tienen 31 millones de filas en el
+rectángulo de Colombia, así que no se cargan completas: DuckDB lee cada CSV
+comprimido en tandas de unas 100\,000 filas y descarta en SQL lo que cae fuera
+de los rectángulos PDET. Luego se prueba con un índice espacial de Shapely si
+el centroide cae dentro de algún municipio PDET. De 31\,370\,317 filas en el
+rectángulo, 16\,512\,141 están dentro de Colombia y 2\,694\,786 en los
+municipios PDET (16,3\,\%). Una corrida de control con las 10 celdas dio
+exactamente los mismos 2\,694\,786 edificios.
+
+\fig{cap_google_prefiltro.png}{0.28}{Prefiltro de Google: acumulados en
+Colombia y tras el prefiltro por cada celda.}{fig:g-prefiltro}
+
+\subsection{Microsoft Building Footprints: descarga y prefiltro}
+\label{sec:microsoft}
+
+Microsoft publica sus huellas globales (versión 2026-02-03) como GeoJSON por
+líneas comprimido, en particiones por \emph{quadkey} de nivel 9; solo traen el
+polígono. \campo{descarga\_microsoft.py} lee el índice público
+\campo{dataset-links.csv}, toma las 232 particiones de Colombia, se queda con
+las 125 que intersectan la unión de los municipios PDET y las baja en paralelo
+(8 hilos), con un \campo{manifest.csv} que guarda el SHA-256 de cada archivo y
+uno global. \campo{limpieza\_microsoft.py} procesa cada archivo en un proceso
+aparte (8 en paralelo) y conserva solo los edificios cuyo centroide cae en
+PDET: de 4\,595\,615 quedan 1\,761\,048.
+
+\fig{cap_ms_limpieza.png}{0.25}{Tabla de control de la limpieza de
+Microsoft.}{fig:ms-limpieza}
+
+\subsection{Limpieza común y contrato del Parquet}
+\label{sec:limpieza}
+
+Las dos fuentes pasan por la misma limpieza, para que los dos Parquet
+intermedios tengan las mismas columnas:
+
+\begin{enumerate}[leftmargin=*]
+  \item Se construyen las geometrías con Shapely y se descartan las ilegibles.
+  \item \textbf{Validación y reparación:} los polígonos inválidos se reparan
+        con \campo{make\_valid}; como el contrato pide \campo{Polygon}, se
+        conserva la parte poligonal mayor.
+  \item \textbf{Área y centroide:} se proyecta a EPSG:9377 para calcular
+        \campo{area\_m2} y el centroide; la geometría se guarda en EPSG:4326.
+  \item \textbf{\campo{geom\_hash}:} hash de la geometría normalizada y
+        redondeada, para que dos copias del mismo edificio den el mismo valor;
+        se descartan los repetidos (un edificio puede venir en dos archivos).
+  \item DuckDB une las partes en un único Parquet comprimido (zstd) con
+        metadatos GeoParquet.
+\end{enumerate}
+
+\begin{table}[H]
+\centering\small
+\caption{Contrato de columnas de los Parquet intermedios.}
+\label{tab:contrato}
+\begin{tabularx}{\textwidth}{@{}p{3.6cm}p{2.2cm}L@{}}
+\toprule
+\textbf{Columna} & \textbf{Tipo} & \textbf{Contenido} \\
+\midrule
+\campo{fuente\_id} & texto & \campo{google} o \campo{microsoft} \\
+\campo{geometry} & WKB & \campo{Polygon} en EPSG:4326 \\
+\campo{centroide\_lon}, \campo{centroide\_lat} & double & Centroide de la huella, en EPSG:4326 \\
+\campo{area\_m2} & double & Área en EPSG:9377, en m\textsuperscript{2} \\
+\campo{area\_m2\_fuente}, \campo{confianza} & double o null & Área y confianza de Google; null en Microsoft \\
+\campo{geom\_hash} & texto & Hash de la geometría normalizada \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Carga eficiente en MongoDB}
+\label{sec:carga}
+
+Con 4,5 millones de documentos, la eficiencia de la carga depende de no
+cargar todo a memoria y de no mantener índices mientras se inserta.
+\campo{carga.py}:
+
+\begin{itemize}
+  \item Lee el Parquet con \campo{pyarrow} en \textbf{lotes de 5\,000 filas}
+        (\campo{config.yaml}); la geometría pasa de WKB a GeoJSON con Shapely.
+  \item Inserta con \campo{insert\_many(ordered=False)}: un documento
+        rechazado no frena el resto del lote.
+  \item \textbf{Crea los índices después de cargar}, porque mantenerlos
+        durante la inserción es más lento. La excepción es el índice de
+        \campo{geometry} (sección~\ref{sec:s2}).
+  \item Es \textbf{idempotente}: borra los documentos previos de la fuente
+        antes de cargar; correrla dos veces deja el mismo conteo.
+  \item Marca cada edificio con un \campo{lote\_id}, que es el \campo{\_id} de
+        su fila en \campo{bitacora\_cargas}, con inicio, fin, registros y
+        velocidad.
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\caption{Carga a MongoDB (MongoDB 8 en Docker local, un solo equipo; los
+tiempos dependen de la máquina).}
+\label{tab:carga}
+\begin{tabularx}{\textwidth}{@{}lrrrrL@{}}
+\toprule
+\textbf{Fuente} & \textbf{Documentos} & \textbf{Rechazados} & \textbf{Reparados (S2)} & \textbf{Tiempo (s)} & \textbf{Velocidad} \\
+\midrule
+Google    & 2\,694\,786 & 0 & 0  & 56,6 & 47\,621 docs/s \\
+Microsoft & 1\,761\,048 & 0 & 29 & 37,7 & 46\,753 docs/s \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Tiempo de creación de los índices de edificios.}
+\label{tab:indices-edif}
+\begin{tabularx}{\textwidth}{@{}p{3.6cm}Lrr@{}}
+\toprule
+\textbf{Índice} & \textbf{Para qué} & \textbf{Google (s)} & \textbf{Microsoft (s)} \\
+\midrule
+\campo{2dsphere} en \campo{centroide} & \campo{\$geoWithin} de la asignación & 6,9 & 4,4 \\
+\campo{2dsphere} en \campo{geometry} & \campo{\$geoIntersects} en límites & \multicolumn{2}{c}{creado antes de cargar} \\
+\campo{cod\_mpio} & agregación por municipio & 2,2 & 1,4 \\
+\campo{geom\_hash} (único) & impedir duplicados & 3,4 & 2,3 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+En disco, \campo{edificios\_google} ocupa 1\,279\,MB de datos y 245\,MB de
+índices, y \campo{edificios\_microsoft} 835\,MB y 175\,MB. El índice único
+sobre \campo{geom\_hash} es una segunda barrera contra duplicados: si alguno
+llegara a la colección, la creación del índice fallaría.
+
+\subsection{Un hallazgo: polígonos válidos para GEOS que MongoDB rechaza}
+\label{sec:s2}
+
+Con todos los índices creados al final, el \campo{2dsphere} sobre
+\campo{geometry} de Microsoft falló: MongoDB construye sus claves con geometría
+esférica (biblioteca S2) y encontró un polígono con aristas que se cruzan,
+aunque GEOS, que trabaja en el plano, lo había dado por válido. Con una sola
+geometría así, la construcción de todo el índice aborta. En una muestra de
+300\,000 edificios hubo 5 casos, unos 2 por millón.
+
+La solución fue crear ese índice \emph{antes} de cargar: así MongoDB rechaza
+solo los documentos afectados y la carga sigue. Cada rechazado se repara
+redondeando las coordenadas a $10^{-6}$ grados (unos 11\,cm) con
+\campo{shapely.set\_precision} y se reintenta; \campo{buffer(0)} y
+\campo{simplify} no resolvieron ninguno de los casos de prueba. En la carga
+completa, Microsoft tuvo 29 reparados y Google ninguno, y no se descartó ningún
+edificio.
+
+\subsection{Evidencia de que los índices se usan}
+\label{sec:evidencia-edif}
+
+\campo{evidencia.py} corre la consulta de asignación sobre el polígono de
+Caldono (19137) con el índice y forzando el recorrido completo
+(\campo{hint(\{\$natural: 1\})}).
+
+\begin{table}[H]
+\centering\small
+\caption{Planes de ejecución en Caldono (una consulta por caso; tiempos
+indicativos).}
+\label{tab:evidencia-edif}
+\begin{tabularx}{\textwidth}{@{}llLrr@{}}
+\toprule
+\textbf{Fuente} & \textbf{Plan} & \textbf{Consulta} & \textbf{Resultados} & \textbf{Tiempo (s)} \\
+\midrule
+Google    & IXSCAN   & \campo{\$geoWithin} sobre \campo{centroide}   & 15\,303 & 0,44 \\
+Google    & IXSCAN   & \campo{\$geoIntersects} sobre \campo{geometry} & 15\,304 & 0,37 \\
+Google    & COLLSCAN & \campo{\$geoWithin} sin índice                 & 15\,303 & 2,93 \\
+Microsoft & IXSCAN   & \campo{\$geoWithin} sobre \campo{centroide}   & 12\,547 & 0,32 \\
+Microsoft & IXSCAN   & \campo{\$geoIntersects} sobre \campo{geometry} & 12\,548 & 0,28 \\
+Microsoft & COLLSCAN & \campo{\$geoWithin} sin índice                 & 12\,547 & 1,93 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+La diferencia de un edificio entre \campo{\$geoWithin} (centroide dentro) y
+\campo{\$geoIntersects} (huella que toca el municipio) es un edificio que cruza
+el límite: es la razón de usar el centroide, para que cada edificio pertenezca
+a un solo municipio.

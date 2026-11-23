@@ -21,8 +21,9 @@ modelo de datos.
 |---|---|---|
 | 1 | Infraestructura (Docker, esquema `$jsonSchema`) | Hecha |
 | 2 | Límites PDET: 170 municipios cargados e indexados | Hecha (Entrega 2) |
-| 3 | Huellas de edificios (Google y Microsoft): 2.694.786 y 1.761.048 edificios cargados e indexados, EDA en `notebooks/eda_edificios.ipynb` | Hecha (pendiente: GeoParquet del Parquet de Microsoft) |
-| 4 | Asignación por centroide, resultados e informe | Pendiente |
+| 3 | Huellas de edificios (Google y Microsoft): 2.694.786 y 1.761.048 edificios cargados e indexados, EDA en `notebooks/eda_edificios.ipynb` | Hecha (Entrega 3) |
+| 4 | Asignación por centroide, `resultados` (170 documentos por fuente y umbral), sensibilidad, mapas y ranking | Hecha (Entrega 4) |
+| Final | Informe técnico autocontenido para la UPME | 26 de noviembre |
 
 ## Cómo correr el proyecto
 
@@ -37,7 +38,13 @@ make up                         # levanta MongoDB 8 en Docker
 make schema                     # crea las colecciones con $jsonSchema (semana 1)
 make municipios                 # descarga, valida y carga los municipios PDET (semana 2)
 make edificios                  # descarga, limpia, carga e indexa edificios de Google y Microsoft (semana 3)
+make analisis                   # asigna, agrega, exporta y genera tablas, mapas y ranking (semana 4)
 ```
+
+`make all` corre todo lo anterior seguido, desde una base vacía. Para retomar el
+análisis desde un paso: `python -m src.analisis.run --desde agregacion`. Para
+rehacer solo los mapas y el ranking sin MongoDB (leen los CSV y el GeoJSON
+versionados): `python -m src.analisis.run --solo-figuras`.
 
 El MGN 2025 no tiene enlace directo y estable: descarga `MGN2025_MPIO_GRAFICO.zip`
 del [geoportal del DANE](https://geoportal.dane.gov.co/servicios/descarga-y-metadatos/datos-geoestadisticos/?cod=111),
@@ -80,10 +87,30 @@ notebooks/     EDA
 
 `run.py` encadena todo en orden (es lo que corre `make municipios`).
 
+### `src/analisis/` — quién hace qué (semana 4)
+
+| Archivo | Tarea | Responsable |
+|---|---|---|
+| `asignacion.py` | Asignar cada edificio a su municipio (`$geoWithin` sobre `centroide`) | Jorge |
+| `evidencia.py` | `explain()`: IXSCAN frente a COLLSCAN | Jorge |
+| `validacion.py` | Validación con GeoPandas en 10 municipios | Jorge |
+| `estilo.py` | Colores por fuente, formato y guardado de figuras | Jose Eduardo |
+| `figuras_eda.py` | Las 4 figuras del EDA rehechas | Jose Eduardo |
+| `agregacion.py` | `$group` + `$merge` a `resultados`, con verificación | Samuel |
+| `sensibilidad.py` | Sensibilidad al umbral de confianza de Google | Samuel |
+| `exportar.py` | CSV por municipio y subregión, tabla por subregión | Samuel |
+| `mapas.py` | Mapas por fuente, de diferencia (D) y de % de techos | Maria Camila |
+| `ranking.py` | Top 15 por área conservadora `min(A_G, A_M)` | Maria Camila |
+| `run.py` | Encadena todo en orden (es lo que corre `make analisis`) | Maria Camila |
+
+Las tablas y figuras de la semana 4 quedan en `Entrega 4/` y `Entrega 4/img/`.
+
 Datos versionados a propósito (el resto de `data/` está en `.gitignore`):
 `data/raw/MunicipiosPDET.xlsx` (insumo pequeño y estable) y
 `data/processed/municipios_pdet.geojson` (salida final, ~37 MB), para que nadie
-tenga que volver a descargar el MGN solo para probar su parte.
+tenga que volver a descargar el MGN solo para probar su parte. En la semana 4 se
+suman `resultados_municipio.csv`, `resultados_subregion.csv` y
+`ranking_municipios.csv`, para rehacer mapas y ranking sin la base.
 
 ## Flujo de trabajo del equipo
 
